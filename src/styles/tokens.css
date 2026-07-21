@@ -1,0 +1,34 @@
+:root {
+  /* Paleta clinica MUVET */
+  --color-primary: #0A1628;       /* azul marino profundo */
+  --color-secondary: #1A7A5E;     /* verde esmeralda clinico */
+  --color-accent-cyan: #4FD1E8;   /* cian frio */
+  --color-accent-white: #FFFFFF;  /* blanco puro */
+  --color-bg: #FFFFFF;            /* fondo blanco */
+  --color-bg-cold: #F4F7F9;       /* gris muy frio */
+  --color-alert: #E8A23D;         /* ambar */
+  --color-critical: #C63B3B;      /* rojo clinico */
+  --color-ok: #1A7A5E;            /* esmeralda */
+  --color-info: #B8E8F0;          /* cian suave */
+
+  --color-text-primary: #0A1628;
+  --color-text-muted: #5A6B7A;
+  --color-border: #E1E8ED;
+
+  --font-size-base: 14px;
+  --font-size-sm: 12px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  --shell-max-width: 430px;
+}
