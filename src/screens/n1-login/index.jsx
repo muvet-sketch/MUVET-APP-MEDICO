@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
+import { routeForRol } from '../../lib/auth';
 import Splash from './Splash';
 import LoginForm from './LoginForm';
 import SignupCredentialsForm from './SignupCredentialsForm';
@@ -8,10 +9,6 @@ import ActorProfileForm from './ActorProfileForm';
 import ForgotPasswordForm from './ForgotPasswordForm';
 
 const SPLASH_DURATION_MS = 900;
-
-function routeForRol(rol) {
-  return rol === 'medico' ? '/home' : '/home-simplificado';
-}
 
 export default function N1Login() {
   const navigate = useNavigate();

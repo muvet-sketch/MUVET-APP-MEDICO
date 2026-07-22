@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import { uploadDocumento } from '../../lib/storage';
 
 const ROLES = [
   { value: 'medico', label: 'Médico Veterinario' },
@@ -42,11 +43,8 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
       if (rol === 'medico' && carneFile) {
         const ext = carneFile.name.split('.').pop();
         const path = `${userId}/carne-${Date.now()}.${ext}`;
-        // SUPUESTO: bucket 'documentos' ya existe en Supabase Storage (creado manualmente por el fundador, ver README).
-        const { error: uploadError } = await supabase.storage.from('documentos').upload(path, carneFile);
-        if (uploadError) throw uploadError;
-        const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(path);
-        carneUrl = publicUrlData.publicUrl;
+        await uploadDocumento(path, carneFile);
+        carneUrl = path;
       }
 
       const perfilRow = {

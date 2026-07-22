@@ -36,3 +36,10 @@ export function onAuthStateChange(callback) {
   });
   return data.subscription;
 }
+
+// D-547: enrutamiento post-login/registro según tipo de actor. Médico tiene
+// flujo clínico completo (N-2); auxiliar y clínica comparten el home
+// simplificado (N-28), sin acceso clínico (D-543/D-548).
+export function routeForRol(rol) {
+  return rol === 'medico' ? '/home' : '/home-simplificado';
+}

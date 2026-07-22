@@ -1,4 +1,33 @@
-// TODO Fase 2 — N-8: Perfil medico. Incluye logo/firma (PNG/JPG <=2MB) estampado en Formula (N-12) y Recomendaciones (N-18) — D-552
+import { useAuth } from '../../app/AuthContext';
+import { ScreenHeader } from '../../components/ui';
+import HeaderPerfil from './HeaderPerfil';
+import PlanCard from './PlanCard';
+import LogoFirmaSection from './LogoFirmaSection';
+import DatosProfesionalesSection from './DatosProfesionalesSection';
+import MatriculaSection from './MatriculaSection';
+import CalificacionSection from './CalificacionSection';
+import NotificacionesSection from './NotificacionesSection';
+import LegalSection from './LegalSection';
+
 export default function N8PerfilMedico() {
-  return null;
+  const { perfil } = useAuth();
+
+  if (!perfil) return null;
+
+  return (
+    <div className="flex min-h-svh flex-col">
+      <ScreenHeader title="Mi Perfil" />
+
+      <div className="flex flex-col gap-5 px-5 pb-8">
+        <HeaderPerfil perfil={perfil} />
+        <PlanCard />
+        <LogoFirmaSection />
+        <DatosProfesionalesSection />
+        <MatriculaSection />
+        <CalificacionSection />
+        <NotificacionesSection />
+        <LegalSection />
+      </div>
+    </div>
+  );
 }

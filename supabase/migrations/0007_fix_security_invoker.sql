@@ -1,0 +1,28 @@
+-- ============================================================================
+-- MUVET · App Médico — Migración 0007: fix security_invoker en
+-- solicitudes_pre_aceptacion (Fase 5, Acción 0B)
+-- ============================================================================
+-- Aplicada directamente contra el proyecto Supabase real (APP_MEDICO,
+-- hwfhzvpfwzejhqxprsfz) — autorizado explícitamente por el fundador.
+--
+-- Hallazgo original (Supabase Advisor, lint security_definer_view, ERROR):
+-- la vista `solicitudes_pre_aceptacion` (creada en 0001, ver D-064) se creó
+-- sin `security_invoker`, por lo que Postgres la trata por defecto como
+-- SECURITY DEFINER implícito: se evalúa con los permisos/RLS del dueño de
+-- la vista (el rol que la creó), no con los del usuario que hace la
+-- consulta. Eso rompe el aislamiento de RLS pensado para esta vista — en la
+-- práctica cualquier política más restrictiva que se agregue en el futuro
+-- sobre `solicitudes` no se aplicaría al leer a través de esta vista.
+--
+-- Corrección: marcar la vista con security_invoker = true para que se
+-- evalúe con los permisos y RLS del usuario que consulta, como cualquier
+-- vista normal.
+--
+-- Verificado que no rompe N-3 (n3-solicitudes): la policy
+-- "solicitudes_select_authenticated" en la tabla base `solicitudes` (0001)
+-- ya permite `select` a cualquier usuario autenticado sin restricción por
+-- fila, así que forzar security_invoker no le quita visibilidad al médico
+-- dueño de sus propias solicitudes — simplemente deja de bypassear RLS.
+-- ============================================================================
+
+alter view solicitudes_pre_aceptacion set (security_invoker = true);
