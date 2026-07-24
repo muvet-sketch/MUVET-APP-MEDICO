@@ -14,13 +14,13 @@ const TIPO_OPCIONES = [
   { value: 'busco', label: 'Buscan médico/auxiliar' },
 ];
 
-export default function TabBuscar({ perfil, rolInicial, tipoInicial }) {
+export default function TabOfertas({ perfil, rolInicial, tipoInicial }) {
   const [zona, setZona] = useState('');
   const [tipo, setTipo] = useState(tipoInicial || '');
   const [rolActor, setRolActor] = useState(rolInicial || '');
   const [publicaciones, setPublicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [contactando, setContactando] = useState(null);
+  const [aceptando, setAceptando] = useState(null);
   const [mensaje, setMensaje] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [toast, setToast] = useState({ message: '', tone: 'ok', visible: false });
@@ -51,17 +51,24 @@ export default function TabBuscar({ perfil, rolInicial, tipoInicial }) {
     return p.rol_objetivo === rolActor;
   });
 
-  async function handleContactar(e) {
+  async function handleAceptar(e) {
     e.preventDefault();
-    if (!contactando || !mensaje.trim()) return;
+    if (!aceptando) return;
     setEnviando(true);
     try {
-      await enviarMensaje({ publicacionId: contactando.id, remitenteId: perfil.id, mensaje: mensaje.trim() });
-      setContactando(null);
+      // D-540: sigue siendo un mensaje único de contacto, no un hilo — "Aceptar
+      // oferta" crea la solicitud (estado 'pendiente'); el dueño la confirma
+      // desde "Mi Oferta" (0011: columna `estado` en relevo_mensajes).
+      await enviarMensaje({
+        publicacionId: aceptando.id,
+        remitenteId: perfil.id,
+        mensaje: mensaje.trim() || 'He aceptado tu oferta en MUVET Relevo.',
+      });
+      setAceptando(null);
       setMensaje('');
-      showToast('Mensaje enviado.', 'ok');
+      showToast('Oferta aceptada. Queda pendiente de confirmación del autor.', 'ok');
     } catch {
-      showToast('No se pudo enviar el mensaje.', 'critical');
+      showToast('No se pudo aceptar la oferta.', 'critical');
     } finally {
       setEnviando(false);
     }
@@ -70,7 +77,13 @@ export default function TabBuscar({ perfil, rolInicial, tipoInicial }) {
   return (
     <div className="flex flex-col gap-4 px-5 py-5">
       <div className="flex flex-col gap-2">
-        <Input label="Zona" placeholder="Filtrar por zona" value={zona} onChange={(e) => setZona(e.target.value)} onBlur={cargar} />
+        <Input
+          label="Zona / Ciudad"
+          placeholder="Filtrar ofertas por zona o ciudad"
+          value={zona}
+          onChange={(e) => setZona(e.target.value)}
+          onBlur={cargar}
+        />
 
         <div className="flex gap-2">
           {TIPO_OPCIONES.map((o) => (
@@ -105,7 +118,7 @@ export default function TabBuscar({ perfil, rolInicial, tipoInicial }) {
 
       {loading && <p className="text-[12px] text-[#5A6B7A]">Cargando…</p>}
       {!loading && visibles.length === 0 && (
-        <Card className="text-center text-[12px] text-[#5A6B7A]">Sin publicaciones que coincidan.</Card>
+        <Card className="text-center text-[12px] text-[#5A6B7A]">Sin ofertas disponibles en esta zona.</Card>
       )}
 
       {!loading &&
@@ -124,28 +137,28 @@ export default function TabBuscar({ perfil, rolInicial, tipoInicial }) {
                 {p.zona ? ` · ${p.zona}` : ''}
                 {p.tipo_jornada ? ` · ${p.tipo_jornada}` : ''}
               </p>
-              <Button variant="outline" fullWidth={false} className="!w-auto px-3 py-2 text-[12px]" onClick={() => setContactando(p)}>
-                Contactar
+              <Button variant="secondary" fullWidth={false} className="!w-auto px-3 py-2 text-[12px]" onClick={() => setAceptando(p)}>
+                Aceptar oferta
               </Button>
             </Card>
           );
         })}
 
-      <Modal open={Boolean(contactando)} onClose={() => setContactando(null)} title="Enviar mensaje">
-        <form onSubmit={handleContactar} className="flex flex-col gap-3">
+      <Modal open={Boolean(aceptando)} onClose={() => setAceptando(null)} title="Aceptar oferta">
+        <form onSubmit={handleAceptar} className="flex flex-col gap-3">
           <p className="text-[12px] text-[#5A6B7A]">
-            Mensaje único de contacto — sin chat en tiempo real (D-540). El autor de la publicación verá tu mensaje en
-            "Mensajes".
+            Mensaje único de contacto — sin chat en tiempo real (D-540). El autor de la oferta verá tu solicitud en su
+            sección "Solicitudes recibidas" y deberá confirmarla.
           </p>
           <textarea
             rows={4}
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value)}
-            placeholder="Escribe tu mensaje…"
+            placeholder="Mensaje (opcional)…"
             className="w-full rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2.5 text-[14px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
           />
-          <Button type="submit" disabled={enviando || !mensaje.trim()}>
-            {enviando ? 'Enviando…' : 'Enviar'}
+          <Button type="submit" disabled={enviando}>
+            {enviando ? 'Enviando…' : 'Aceptar oferta'}
           </Button>
         </form>
       </Modal>

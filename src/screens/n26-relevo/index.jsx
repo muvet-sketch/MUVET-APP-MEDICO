@@ -1,25 +1,27 @@
-// N-26 · MUVET Relevo (Fase 7). Publicar/buscar/contactar entre médico,
-// auxiliar y clínica. D-540: mensaje único de contacto, sin chat en tiempo
-// real. D-545: clínica solo publica "busco médico/auxiliar"; médico/auxiliar
-// solo "ofrezco disponibilidad". Esquema y RLS ya existían desde 0001.
+// N-26 · MUVET Relevo (Fase 7). "Ofertas" (explorar y aceptar) / "Mi Oferta"
+// (publicar, activar/desactivar, editar, solicitudes recibidas) / "Mensajes"
+// entre médico, auxiliar y clínica. D-540: mensaje único de contacto, sin
+// chat en tiempo real. D-545: clínica solo publica "busco médico/auxiliar";
+// médico/auxiliar solo "ofrezco disponibilidad". Esquema y RLS desde 0001,
+// estado de aceptación de solicitudes agregado en 0011.
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ScreenHeader } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
-import TabPublicar from './TabPublicar';
-import TabBuscar from './TabBuscar';
+import TabMiOferta from './TabMiOferta';
+import TabOfertas from './TabOfertas';
 import TabMensajes from './TabMensajes';
 
 const TABS = [
-  { key: 'buscar', label: 'Buscar' },
-  { key: 'publicar', label: 'Publicar' },
+  { key: 'ofertas', label: 'Ofertas' },
+  { key: 'mi-oferta', label: 'Mi Oferta' },
   { key: 'mensajes', label: 'Mensajes' },
 ];
 
 export default function N26Relevo() {
   const { perfil } = useAuth();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(searchParams.get('rol') || searchParams.get('tipo') ? 'buscar' : 'buscar');
+  const [tab, setTab] = useState('ofertas');
 
   if (!perfil) return null;
 
@@ -43,14 +45,14 @@ export default function N26Relevo() {
         ))}
       </div>
 
-      {tab === 'buscar' && (
-        <TabBuscar
+      {tab === 'ofertas' && (
+        <TabOfertas
           perfil={perfil}
           rolInicial={searchParams.get('rol') || ''}
           tipoInicial={searchParams.get('tipo') || ''}
         />
       )}
-      {tab === 'publicar' && <TabPublicar perfil={perfil} />}
+      {tab === 'mi-oferta' && <TabMiOferta perfil={perfil} />}
       {tab === 'mensajes' && <TabMensajes perfil={perfil} />}
     </div>
   );

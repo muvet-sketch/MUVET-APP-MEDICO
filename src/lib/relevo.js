@@ -88,6 +88,35 @@ export async function desactivarPublicacion(id, autorId) {
   if (error) throw error;
 }
 
+export async function activarPublicacion(id, autorId) {
+  const { error } = await supabase
+    .from('relevo_publicaciones')
+    .update({ activa: true })
+    .eq('id', id)
+    .eq('autor_id', autorId);
+  if (error) throw error;
+}
+
+// Usado por "Editar Oferta" en Mi Oferta (N-26). No cambia `tipo` ni
+// `rol_objetivo` (D-545 ya los fija al crear; editar solo ajusta parámetros).
+export async function actualizarPublicacion(id, autorId, { descripcion, zona, fechaInicio, fechaFin, tipoJornada }) {
+  const { data, error } = await supabase
+    .from('relevo_publicaciones')
+    .update({
+      descripcion: descripcion || null,
+      zona: zona || null,
+      fecha_inicio: fechaInicio || null,
+      fecha_fin: fechaFin || null,
+      tipo_jornada: tipoJornada || null,
+    })
+    .eq('id', id)
+    .eq('autor_id', autorId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // D-540: mensaje único de contacto, sin hilo de chat.
 export async function enviarMensaje({ publicacionId, remitenteId, mensaje }) {
   const { data, error } = await supabase
@@ -99,10 +128,18 @@ export async function enviarMensaje({ publicacionId, remitenteId, mensaje }) {
   return data;
 }
 
+// El dueño de la publicación marca una solicitud recibida como aceptada
+// (0011: policy de update scoped a `p.autor_id = auth.uid()`). No abre un
+// hilo ni notifica en tiempo real (D-540) — es solo el estado de la fila.
+export async function aceptarSolicitud(mensajeId) {
+  const { error } = await supabase.from('relevo_mensajes').update({ estado: 'aceptada' }).eq('id', mensajeId);
+  if (error) throw error;
+}
+
 export async function fetchMensajesRecibidos(autorId) {
   const { data, error } = await supabase
     .from('relevo_mensajes')
-    .select('*, publicacion:publicacion_id!inner(id, tipo, descripcion, autor_id), remitente:remitente_id(id, rol, nombre_completo, razon_social)')
+    .select('*, publicacion:publicacion_id!inner(id, tipo, descripcion, autor_id), remitente:remitente_id(id, rol, nombre_completo, razon_social, telefono)')
     .eq('publicacion.autor_id', autorId)
     .order('created_at', { ascending: false });
   if (error) throw error;
