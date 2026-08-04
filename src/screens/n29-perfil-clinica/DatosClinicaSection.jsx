@@ -3,7 +3,8 @@ import { useAuth } from '../../app/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { uploadDocumento, useSignedUrl } from '../../lib/storage';
 import { validateImageFile } from '../../lib/fileValidation';
-import { Card, Input, Button, Toast } from '../../components/ui';
+import { Card, Input, Button, Toast, ChipMultiSelect } from '../../components/ui';
+import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
 
 export default function DatosClinicaSection() {
   const { perfil, session, refreshPerfil } = useAuth();
@@ -11,6 +12,12 @@ export default function DatosClinicaSection() {
   const [nit, setNit] = useState(perfil?.nit ?? '');
   const [direccionSede, setDireccionSede] = useState(perfil?.direccion_sede ?? '');
   const [telefono, setTelefono] = useState(perfil?.telefono ?? '');
+  // `zona_cobertura` es la zona con la que se filtra la pestaña Ofertas de
+  // Relevo (antes era un campo de búsqueda dentro de esa pestaña). Médico y
+  // auxiliar ya la editaban en su perfil; la clínica no la tenía. Ahora las
+  // tres eligen de un mismo catálogo cerrado (lib/municipios.js) en vez de
+  // texto libre.
+  const [zonas, setZonas] = useState(parseZonas(perfil?.zona_cobertura));
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState('');
@@ -34,6 +41,7 @@ export default function DatosClinicaSection() {
           nit: nit.trim() || null,
           direccion_sede: direccionSede.trim() || null,
           telefono: telefono.trim() || null,
+          zona_cobertura: serializarZonas(zonas),
         })
         .eq('id', perfil.id);
       if (updateError) throw updateError;
@@ -98,6 +106,15 @@ export default function DatosClinicaSection() {
       <Input label="NIT" value={nit} onChange={(e) => setNit(e.target.value)} />
       <Input label="Dirección de la sede" value={direccionSede} onChange={(e) => setDireccionSede(e.target.value)} />
       <Input label="Teléfono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+
+      <ChipMultiSelect
+        searchable
+        label={`Zonas de cobertura para buscar en Relevo (${zonas.length})`}
+        options={ZONAS_COBERTURA}
+        value={zonas}
+        onChange={setZonas}
+      />
+
       <Input label="Correo" value={session?.user?.email ?? ''} disabled />
 
       {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}

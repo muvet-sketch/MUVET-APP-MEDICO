@@ -4,27 +4,16 @@ import { supabase } from '../../lib/supabase';
 import { uploadDocumento, useSignedUrl } from '../../lib/storage';
 import { validateImageFile } from '../../lib/fileValidation';
 import { getInitials } from '../../lib/format';
-import { Card, Input, Button, Toast } from '../../components/ui';
+import { Card, Input, Button, Toast, ChipMultiSelect } from '../../components/ui';
+import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
 
 const BIO_MAX = 200;
-
-// SUPUESTO: zona_cobertura es una sola columna de texto en `perfiles` (no un
-// array). Para poder editarla como chips sin extender el esquema fuera del
-// alcance de esta fase (la migración 0002 solo agrega columnas de
-// notificaciones), las zonas se guardan como texto separado por comas.
-function parseZonas(zonaCobertura) {
-  return (zonaCobertura ?? '')
-    .split(',')
-    .map((z) => z.trim())
-    .filter(Boolean);
-}
 
 export default function DatosProfesionalesSection() {
   const { perfil, refreshPerfil } = useAuth();
   const [especialidad, setEspecialidad] = useState(perfil?.especialidad ?? '');
   const [bio, setBio] = useState(perfil?.bio ?? '');
   const [zonas, setZonas] = useState(parseZonas(perfil?.zona_cobertura));
-  const [nuevaZona, setNuevaZona] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [error, setError] = useState('');
@@ -33,18 +22,6 @@ export default function DatosProfesionalesSection() {
   function showToast(message, tone = 'ok') {
     setToast({ message, tone, visible: true });
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), 2500);
-  }
-
-  function addZona() {
-    const value = nuevaZona.trim();
-    if (value && !zonas.includes(value)) {
-      setZonas([...zonas, value]);
-    }
-    setNuevaZona('');
-  }
-
-  function removeZona(zona) {
-    setZonas(zonas.filter((z) => z !== zona));
   }
 
   async function handleGuardar() {
@@ -56,7 +33,7 @@ export default function DatosProfesionalesSection() {
         .update({
           especialidad: especialidad.trim() || null,
           bio: bio.trim() || null,
-          zona_cobertura: zonas.join(', ') || null,
+          zona_cobertura: serializarZonas(zonas),
         })
         .eq('id', perfil.id);
       if (updateError) throw updateError;
@@ -149,43 +126,14 @@ export default function DatosProfesionalesSection() {
         />
       </div>
 
-      <div className="w-full text-left">
-        <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Zonas de cobertura</label>
-        <div className="mb-2 flex flex-wrap gap-2">
-          {zonas.map((zona) => (
-            <span
-              key={zona}
-              className="flex items-center gap-1 rounded-full bg-[#F4F7F9] px-3 py-1 text-[12px] text-[#0A1628]"
-            >
-              {zona}
-              <button
-                type="button"
-                aria-label={`Quitar ${zona}`}
-                onClick={() => removeZona(zona)}
-                className="text-[#5A6B7A]"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <Input
-            value={nuevaZona}
-            onChange={(e) => setNuevaZona(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addZona();
-              }
-            }}
-            placeholder="Agregar zona"
-          />
-          <Button variant="outline" fullWidth={false} onClick={addZona}>
-            Agregar
-          </Button>
-        </div>
-      </div>
+      <ChipMultiSelect
+        searchable
+        label={`Zonas de cobertura (${zonas.length})`}
+        hint="También filtran las ofertas que ves en MUVET Relevo."
+        options={ZONAS_COBERTURA}
+        value={zonas}
+        onChange={setZonas}
+      />
 
       {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}
 

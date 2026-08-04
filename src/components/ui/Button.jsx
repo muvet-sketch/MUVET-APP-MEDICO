@@ -3,6 +3,7 @@ const VARIANTS = {
   secondary: 'bg-[#1A7A5E] text-white active:bg-[#156049] disabled:bg-[#9AA5B1]',
   outline: 'bg-transparent text-[#0A1628] border border-[#0A1628] active:bg-[#F4F7F9] disabled:text-[#9AA5B1] disabled:border-[#9AA5B1]',
   ghost: 'bg-transparent text-[#0A1628] active:bg-[#F4F7F9]',
+  danger: 'bg-transparent text-[#C63B3B] border border-[#C63B3B] active:bg-[#C63B3B1A] disabled:text-[#9AA5B1] disabled:border-[#9AA5B1]',
 };
 
 export default function Button({

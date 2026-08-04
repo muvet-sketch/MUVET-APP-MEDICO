@@ -1,20 +1,22 @@
 // N-28 · Home Auxiliar/Clínica (Fase 7). Dashboard simplificado: solo Relevo
 // + perfil — sin ningún rastro de flujo clínico ni Constelación (D-543).
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { signOut } from '../../lib/auth';
 import { fetchMisPublicaciones, fetchMensajesRecibidos } from '../../lib/relevo';
-import { Card, Button } from '../../components/ui';
+import { Card, Button, BottomNav, NotificationBell } from '../../components/ui';
 import PerfilAuxiliarInline from './PerfilAuxiliarInline';
+import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
 
 export default function N28HomeSimplificado() {
   const { perfil } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [publicaciones, setPublicaciones] = useState([]);
   const [mensajesCount, setMensajesCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [mostrarPerfil, setMostrarPerfil] = useState(false);
+  const [mostrarPerfil, setMostrarPerfil] = useState(searchParams.get('perfil') === '1');
 
   useEffect(() => {
     if (!perfil?.id) return;
@@ -45,9 +47,12 @@ export default function N28HomeSimplificado() {
           <p className="text-[12px] text-[#5A6B7A]">Hola,</p>
           <h1 className="text-[18px] font-semibold text-[#0A1628]">{nombreMostrado}</h1>
         </div>
-        <button type="button" onClick={signOut} className="text-[12px] text-[#5A6B7A] underline underline-offset-2">
-          Salir
-        </button>
+        <div className="flex items-center gap-3">
+          <NotificationBell perfilId={perfil.id} />
+          <button type="button" onClick={signOut} className="text-[12px] text-[#5A6B7A] underline underline-offset-2">
+            Salir
+          </button>
+        </div>
       </div>
 
       <Card className="flex items-center justify-between gap-3">
@@ -84,23 +89,16 @@ export default function N28HomeSimplificado() {
         </Button>
       )}
 
-      {!esClinica && mostrarPerfil && <PerfilAuxiliarInline onClose={() => setMostrarPerfil(false)} />}
+      {!esClinica && mostrarPerfil && (
+        <>
+          <PerfilAuxiliarInline onClose={() => setMostrarPerfil(false)} />
+          {/* El auxiliar configura sus habilidades aquí; la clínica no las
+              tiene en perfil (las declara por oferta, ver 0015). */}
+          <HabilidadesPerfilSection />
+        </>
+      )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-[430px] border-t border-[#E1E8ED] bg-white px-5 py-3">
-        <button type="button" className="flex-1 text-center text-[12px] font-medium text-[#0A1628]" onClick={() => navigate('/home-simplificado')}>
-          Inicio
-        </button>
-        <button type="button" className="flex-1 text-center text-[12px] font-medium text-[#5A6B7A]" onClick={() => navigate('/relevo')}>
-          Relevo
-        </button>
-        <button
-          type="button"
-          className="flex-1 text-center text-[12px] font-medium text-[#5A6B7A]"
-          onClick={() => (esClinica ? navigate('/perfil-clinica') : setMostrarPerfil(true))}
-        >
-          Perfil
-        </button>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

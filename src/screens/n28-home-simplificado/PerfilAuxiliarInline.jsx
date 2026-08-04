@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../../app/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Card, Input, Button, Toast } from '../../components/ui';
+import { Card, Input, Button, Toast, ChipMultiSelect } from '../../components/ui';
+import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
 
 // SUPUESTO: el Auxiliar no tiene una pantalla de perfil propia con número de
 // pantalla asignado (a diferencia de N-29 para Clínica) — el despacho de
@@ -12,7 +13,7 @@ export default function PerfilAuxiliarInline({ onClose }) {
   const { perfil, refreshPerfil } = useAuth();
   const [nombreCompleto, setNombreCompleto] = useState(perfil?.nombre_completo ?? '');
   const [telefono, setTelefono] = useState(perfil?.telefono ?? '');
-  const [zonaCobertura, setZonaCobertura] = useState(perfil?.zona_cobertura ?? '');
+  const [zonas, setZonas] = useState(parseZonas(perfil?.zona_cobertura));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState({ message: '', tone: 'ok', visible: false });
@@ -32,7 +33,7 @@ export default function PerfilAuxiliarInline({ onClose }) {
         .update({
           nombre_completo: nombreCompleto.trim(),
           telefono: telefono.trim(),
-          zona_cobertura: zonaCobertura.trim(),
+          zona_cobertura: serializarZonas(zonas),
         })
         .eq('id', perfil.id);
       if (updateError) throw updateError;
@@ -57,7 +58,14 @@ export default function PerfilAuxiliarInline({ onClose }) {
       <form onSubmit={handleGuardar} className="flex flex-col gap-3">
         <Input label="Nombre completo" required value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} />
         <Input label="Teléfono" required value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-        <Input label="Zona de cobertura" required value={zonaCobertura} onChange={(e) => setZonaCobertura(e.target.value)} />
+        <ChipMultiSelect
+          searchable
+          label={`Zona de cobertura (${zonas.length})`}
+          hint="También filtra las ofertas que ves en MUVET Relevo."
+          options={ZONAS_COBERTURA}
+          value={zonas}
+          onChange={setZonas}
+        />
 
         {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}
 

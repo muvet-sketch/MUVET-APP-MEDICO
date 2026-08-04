@@ -1,12 +1,15 @@
-// N-26 · MUVET Relevo (Fase 7). "Ofertas" (explorar y aceptar) / "Mi Oferta"
-// (publicar, activar/desactivar, editar, solicitudes recibidas) / "Mensajes"
-// entre médico, auxiliar y clínica. D-540: mensaje único de contacto, sin
-// chat en tiempo real. D-545: clínica solo publica "busco médico/auxiliar";
-// médico/auxiliar solo "ofrezco disponibilidad". Esquema y RLS desde 0001,
-// estado de aceptación de solicitudes agregado en 0011.
+// N-26 · MUVET Relevo (Fase 7). "Ofertas" (explorar y aceptar de otros +
+// solicitudes recibidas sobre mis propias ofertas) / "Mi Oferta" (publicar,
+// activar/desactivar, editar, mis postulaciones) / "Mensajes" entre médico,
+// auxiliar y clínica. D-540: mensaje único de contacto, sin
+// chat en tiempo real. D-545 (revisado, ver PUBLICACIONES_PERMITIDAS_POR_ROL
+// en lib/relevo.js): médico ofrece a clínicas o solicita apoyo a un
+// auxiliar; auxiliar ofrece a clínicas y a médicos; clínica busca médico o
+// auxiliar. Esquema y RLS desde 0001, estado de aceptación de solicitudes
+// agregado en 0011.
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ScreenHeader } from '../../components/ui';
+import { ScreenHeader, BottomNav } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
 import TabMiOferta from './TabMiOferta';
 import TabOfertas from './TabOfertas';
@@ -21,7 +24,7 @@ const TABS = [
 export default function N26Relevo() {
   const { perfil } = useAuth();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState('ofertas');
+  const [tab, setTab] = useState(TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'ofertas');
 
   if (!perfil) return null;
 
@@ -46,14 +49,11 @@ export default function N26Relevo() {
       </div>
 
       {tab === 'ofertas' && (
-        <TabOfertas
-          perfil={perfil}
-          rolInicial={searchParams.get('rol') || ''}
-          tipoInicial={searchParams.get('tipo') || ''}
-        />
+        <TabOfertas perfil={perfil} rolInicial={searchParams.get('rol') || ''} />
       )}
       {tab === 'mi-oferta' && <TabMiOferta perfil={perfil} />}
       {tab === 'mensajes' && <TabMensajes perfil={perfil} />}
+      <BottomNav />
     </div>
   );
 }

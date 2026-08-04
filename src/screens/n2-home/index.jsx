@@ -14,7 +14,7 @@ import ValidationBadge from './ValidationBadge';
 import DisponibleToggle from './DisponibleToggle';
 import QuickAccess from './QuickAccess';
 import ActivityFeed from './ActivityFeed';
-import { Card, Button, Toast } from '../../components/ui';
+import { Card, Button, Toast, BottomNav, NotificationBell } from '../../components/ui';
 import N3Solicitudes from '../n3-solicitudes';
 
 export default function N2Home() {
@@ -144,15 +144,18 @@ export default function N2Home() {
   if (!perfil) return null;
 
   return (
-    <div className="flex flex-col gap-5 px-5 py-6">
+    <div className="flex flex-col gap-5 px-5 py-6 pb-24">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-[12px] text-[#5A6B7A]">Hola,</p>
           <h1 className="text-[18px] font-semibold text-[#0A1628]">{perfil.nombre_completo}</h1>
         </div>
-        <button type="button" onClick={signOut} className="text-[12px] text-[#5A6B7A] underline underline-offset-2">
-          Salir
-        </button>
+        <div className="flex items-center gap-3">
+          <NotificationBell perfilId={perfil.id} />
+          <button type="button" onClick={signOut} className="text-[12px] text-[#5A6B7A] underline underline-offset-2">
+            Salir
+          </button>
+        </div>
       </div>
 
       <ValidationBadge estadoValidacion={perfil.estado_validacion} />
@@ -193,6 +196,7 @@ export default function N2Home() {
       )}
 
       <Toast message={toast.message} tone={toast.tone} visible={toast.visible} />
+      <BottomNav />
     </div>
   );
 }
