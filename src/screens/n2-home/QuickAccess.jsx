@@ -5,6 +5,10 @@ const LINKS = [
   { to: '/servicios', label: '🏠 Domicilios' },
   { to: '/historial', label: 'Historial' },
   { to: '/relevo', label: 'MUVET Relevo' },
+  // Cobertura de Servicio: función nueva médico↔médico, exclusiva de
+  // médicos — N-2 Home ya está restringida a rol='medico' en el router, así
+  // que el botón queda automáticamente exclusivo sin lógica extra acá.
+  { to: '/cobertura-servicio', label: '🤝 Cobertura de Servicio' },
   { to: '/perfil', label: '👤 Perfil' },
 ];
 

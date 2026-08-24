@@ -19,6 +19,9 @@ import {
   contarRelevosConfirmados,
   normalizarCupos,
   PUBLICACIONES_PERMITIDAS_POR_ROL,
+  sumarHoras,
+  calcularDuracionHoras,
+  formatFranjaHoraria,
 } from '../../lib/relevo';
 import {
   HABILIDADES_PROFESIONALES,
@@ -29,7 +32,27 @@ import {
 } from '../../lib/habilidades';
 import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
 
-const TIPO_JORNADA = ['Medio día', 'Día completo', 'Varios días'];
+const TIPO_JORNADA = ['Turno completo', 'Medio turno', 'Turno 12 Horas', 'Varios días'];
+// Compatibilidad con publicaciones creadas antes del renombre — `tipo_jornada`
+// no tiene CHECK constraint en BD (texto libre), así que las filas viejas
+// conservan la etiqueta anterior tal cual; esto solo remapea al abrir el
+// formulario de edición para que el botón correspondiente quede resaltado.
+const MIGRAR_TIPO_JORNADA = { 'Día completo': 'Turno completo', 'Medio día': 'Medio turno' };
+// Duración por defecto de cada turno (0022): ya no hay un campo de "duración
+// del turno" editable — la hora de fin se autocompleta con estos valores al
+// elegir el turno o al cambiar la hora de inicio, y el usuario puede
+// sobreescribirla directamente si el turno real no calza con el preset.
+const DURACION_PREDETERMINADA = { 'Turno completo': 8, 'Medio turno': 4, 'Turno 12 Horas': 12, 'Varios días': 8 };
+// Procedimientos que un médico puede solicitarle a un auxiliar (aparte de
+// pedir su apoyo por jornada completa) — pedido puntual para la combinación
+// médico → auxiliar (busco:auxiliar).
+const PROCEDIMIENTOS_AUXILIAR = [
+  'Asistencia en consulta',
+  'Asistencia en cirugía',
+  'Asistencia en ecografía',
+  'Asistencia en rayos X',
+  'Toma de muestras',
+];
 const ACTOR_LABEL = { clinica: '🏥 Clínica', auxiliar: '🧰 Auxiliar', medico: '🩺 Médico' };
 
 // Etiquetas de cada combinación (tipo, rol_objetivo) permitida por rol —
@@ -85,26 +108,57 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
   const [opcionKey, setOpcionKey] = useState(initialKey);
   const opcionSeleccionada = opciones.find((o) => o.key === opcionKey) ?? opciones[0];
 
+  // Solo el médico solicitando apoyo a un auxiliar (busco:auxiliar) puede
+  // definir la oferta por procedimiento en vez de por jornada — pedido
+  // puntual para esa combinación, no aplica a las demás.
+  const puedeElegirProcedimiento = perfil.rol === 'medico' && opcionSeleccionada?.rolObjetivo === 'auxiliar';
+  const [modoOferta, setModoOferta] = useState(initial?.procedimientos?.length > 0 ? 'procedimiento' : 'jornada');
+  const [procedimientos, setProcedimientos] = useState(initial?.procedimientos ?? []);
+  const mostrarJornada = !puedeElegirProcedimiento || modoOferta === 'jornada';
+
   const [descripcion, setDescripcion] = useState(initial?.descripcion ?? '');
+  // La clínica tiene una sola sede física (D-544): su "zona" de la oferta es
+  // la dirección del establecimiento, de solo lectura, no un catálogo de
+  // zonas para elegir (eso es para médico/auxiliar, que se desplazan).
+  const esClinica = perfil.rol === 'clinica';
+  const zonaClinica = perfil.direccion_sede?.trim() || '';
   // Mismo catálogo cerrado que el resto del perfil (lib/municipios.js) en vez
   // de texto libre, para que el matching por zona en TabOfertas compare
   // valores consistentes (antes un Input libre no ofrecía ningún buscador
   // real ni garantizaba que el texto coincidiera con el catálogo).
   const [zonas, setZonas] = useState(parseZonas(initial?.zona ?? perfil.zona_cobertura));
-  const [tipoJornada, setTipoJornada] = useState(initial?.tipo_jornada ?? TIPO_JORNADA[0]);
-  // Medio día / Día completo arrancan en hoy (un solo día); Varios días
-  // arranca vacío para que el rango lo defina el usuario.
+  const [tipoJornada, setTipoJornada] = useState(
+    MIGRAR_TIPO_JORNADA[initial?.tipo_jornada] ?? initial?.tipo_jornada ?? TIPO_JORNADA[0],
+  );
+  // Medio turno / Turno completo arrancan en hoy (un solo día); Varios días
+  // arranca vacío para que el rango lo defina el usuario. Por procedimiento
+  // también es de un solo día (mismo criterio que medio turno/turno completo).
   const [fechaInicio, setFechaInicio] = useState(
-    initial?.fecha_inicio ?? (tipoJornada === 'Varios días' ? '' : new Date().toISOString().slice(0, 10)),
+    initial?.fecha_inicio ?? (tipoJornada === 'Varios días' && mostrarJornada ? '' : new Date().toISOString().slice(0, 10)),
   );
   const [fechaFin, setFechaFin] = useState(
-    initial?.fecha_fin ?? (tipoJornada === 'Varios días' ? '' : new Date().toISOString().slice(0, 10)),
+    initial?.fecha_fin ?? (tipoJornada === 'Varios días' && mostrarJornada ? '' : new Date().toISOString().slice(0, 10)),
   );
+  // Franja horaria (0021, revisado en 0022): la hora de fin ya no depende de
+  // un campo de "duración" que el usuario deba escribir — se autocompleta al
+  // elegir un turno con duración fija (Turno completo/Medio turno/Turno 12
+  // Horas) o al cambiar la hora de inicio. Sigue siendo un input normal, así
+  // que el usuario puede sobreescribirla después si el turno real no calza
+  // con el preset.
+  const [horaInicio, setHoraInicio] = useState(initial?.hora_inicio?.slice(0, 5) ?? '08:00');
+  const [horaFin, setHoraFin] = useState(
+    initial?.hora_fin?.slice(0, 5) ||
+      sumarHoras(initial?.hora_inicio?.slice(0, 5) ?? '08:00', DURACION_PREDETERMINADA[tipoJornada] ?? 8),
+  );
+
+  function handleHoraInicio(value) {
+    setHoraInicio(value);
+    setHoraFin(sumarHoras(value, DURACION_PREDETERMINADA[tipoJornada] ?? 8));
+  }
   const [tarifa, setTarifa] = useState(initial?.tarifa ?? '');
   const [turnos, setTurnos] = useState(initial?.turnos ?? []);
   const [nuevoTurno, setNuevoTurno] = useState('');
-  const [habilidades, setHabilidades] = useState(initial?.habilidades ?? []);
-  const [nuevaHabilidad, setNuevaHabilidad] = useState('');
+  const habilidades = initial?.habilidades ?? [];
   // Cupos (0016): solo la clínica puede pedir varios médicos o auxiliares con
   // una misma publicación; médico y auxiliar se ofrecen a sí mismos (1).
   const [cupos, setCupos] = useState(initial?.cupos ?? 1);
@@ -135,11 +189,14 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
   // auxiliar y clínica) — el pedido no distinguió, y para una clínica
   // ("busco") estos campos sirven para describir el turno ofrecido.
 
-  // Medio día / Día completo son de un solo día: al elegirlos el calendario
-  // se adelanta a hoy para que el médico no tenga que abrirlo. "Varios días"
-  // sí necesita un rango, así que ahí se deja Desde/Hasta en manos del usuario.
+  // Medio turno / Turno completo son de un solo día: al elegirlos el
+  // calendario se adelanta a hoy para que el médico no tenga que abrirlo.
+  // "Varios días" sí necesita un rango, así que ahí se deja Desde/Hasta en
+  // manos del usuario. La duración también vuelve a su valor por defecto
+  // (8h turno completo / 4h medio turno) al cambiar de jornada.
   function handleTipoJornada(t) {
     setTipoJornada(t);
+    setHoraFin(sumarHoras(horaInicio, DURACION_PREDETERMINADA[t] ?? 8));
     if (t !== 'Varios días') {
       const hoy = new Date().toISOString().slice(0, 10);
       setFechaInicio(hoy);
@@ -162,29 +219,25 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
     setNuevoTurno('');
   }
 
-  function quitarHabilidad(h) {
-    setHabilidades((prev) => prev.filter((x) => x !== h));
-  }
-
-  function agregarHabilidad() {
-    const h = nuevaHabilidad.trim();
-    if (!h) return;
-    setHabilidades((prev) => (prev.includes(h) ? prev : [...prev, h]));
-    setNuevaHabilidad('');
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setSaving(true);
     try {
       const tarifaNum = tarifa === '' ? null : Number(tarifa);
+      // Por jornada y por procedimiento son mutuamente excluyentes: se manda
+      // uno u otro, nunca los dos, para que la etiqueta de la oferta no
+      // mezcle una jornada con procedimientos de una elección anterior.
       const campos = {
         descripcion,
-        zona: serializarZonas(zonas),
+        zona: esClinica ? zonaClinica : serializarZonas(zonas),
         fechaInicio,
         fechaFin,
-        tipoJornada,
+        tipoJornada: mostrarJornada ? tipoJornada : null,
+        horaInicio,
+        horaFin,
+        duracionHoras: calcularDuracionHoras(horaInicio, horaFin),
+        procedimientos: puedeElegirProcedimiento && modoOferta === 'procedimiento' ? procedimientos : [],
         tarifa: tarifaNum,
         turnos,
         habilidades,
@@ -260,33 +313,75 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
         />
       </div>
 
-      <ChipMultiSelect
-        searchable
-        label={`Zona / Ciudad (${zonas.length})`}
-        options={ZONAS_COBERTURA}
-        value={zonas}
-        onChange={setZonas}
-      />
-
-      <div className="w-full text-left">
-        <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Jornada</label>
-        <div className="flex gap-2">
-          {TIPO_JORNADA.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => handleTipoJornada(t)}
-              className={`flex-1 rounded-[10px] border px-2 py-2 text-[12px] ${
-                tipoJornada === t ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+      {esClinica ? (
+        <div className="w-full text-left">
+          <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Zona / Ciudad</label>
+          <p className="rounded-[10px] border border-[#E1E8ED] bg-[#F4F7F9] px-3 py-2.5 text-[14px] text-[#0A1628]">
+            {zonaClinica || 'Configura la dirección del establecimiento en tu perfil.'}
+          </p>
         </div>
-      </div>
+      ) : (
+        <ChipMultiSelect
+          searchable
+          label={`Zona / Ciudad (${zonas.length})`}
+          options={ZONAS_COBERTURA}
+          value={zonas}
+          onChange={setZonas}
+        />
+      )}
 
-      {tipoJornada === 'Varios días' ? (
+      {puedeElegirProcedimiento && (
+        <div className="w-full text-left">
+          <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">¿Cómo defines esta oferta?</label>
+          <div className="flex gap-2">
+            {[
+              { value: 'jornada', label: 'Por jornada' },
+              { value: 'procedimiento', label: 'Por procedimiento' },
+            ].map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => setModoOferta(o.value)}
+                className={`flex-1 rounded-[10px] border px-2 py-2 text-[12px] ${
+                  modoOferta === o.value ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mostrarJornada ? (
+        <div className="w-full text-left">
+          <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Jornada</label>
+          <div className="flex flex-wrap gap-2">
+            {TIPO_JORNADA.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => handleTipoJornada(t)}
+                className={`min-w-[45%] flex-1 rounded-[10px] border px-2 py-2 text-[12px] ${
+                  tipoJornada === t ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <ChipMultiSelect
+          allowCustom
+          label={`Procedimientos solicitados (${procedimientos.length})`}
+          options={PROCEDIMIENTOS_AUXILIAR}
+          value={procedimientos}
+          onChange={setProcedimientos}
+        />
+      )}
+
+      {mostrarJornada && tipoJornada === 'Varios días' ? (
         <div className="flex gap-2">
           <Input label="Desde" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
           <Input label="Hasta" type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
@@ -302,6 +397,11 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
           }}
         />
       )}
+
+      <div className="flex gap-2">
+        <Input label="Hora de inicio" type="time" value={horaInicio} onChange={(e) => handleHoraInicio(e.target.value)} />
+        <Input label="Hora de fin" type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+      </div>
 
       {perfil.rol === 'clinica' && (
         <Input
@@ -377,6 +477,7 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
 
       <ChipMultiSelect
         collapsible
+        allowCustom
         label={usaPerfil ? 'Habilidades profesionales' : 'Habilidades profesionales que esperas del candidato'}
         hint={usaPerfil ? 'También puedes configurarlas desde tu perfil.' : undefined}
         options={HABILIDADES_PROFESIONALES}
@@ -386,53 +487,12 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
 
       <ChipMultiSelect
         collapsible
+        allowCustom
         label={usaPerfil ? 'Habilidades personales' : 'Habilidades personales que esperas del candidato'}
         options={HABILIDADES_PERSONALES}
         value={habPersonales}
         onChange={setHabPersonales}
       />
-
-      <div className="w-full text-left">
-        <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Otras habilidades</label>
-        {habilidades.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {habilidades.map((h) => (
-              <span
-                key={h}
-                className="flex items-center gap-1 rounded-full bg-[#F4F7F9] px-3 py-1 text-[12px] text-[#0A1628]"
-              >
-                {h}
-                <button type="button" aria-label={`Quitar ${h}`} onClick={() => quitarHabilidad(h)} className="text-[#5A6B7A]">
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="flex gap-2">
-          <input
-            value={nuevaHabilidad}
-            onChange={(e) => setNuevaHabilidad(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                agregarHabilidad();
-              }
-            }}
-            placeholder="Agregar otra habilidad…"
-            className="flex-1 rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2 text-[13px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            fullWidth={false}
-            className="!w-auto px-3 py-2 text-[12px]"
-            onClick={agregarHabilidad}
-          >
-            + Agregar
-          </Button>
-        </div>
-      </div>
 
       {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}
 
@@ -602,9 +662,19 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOf
                 : `Busco ${oferta.rol_objetivo === 'auxiliar' ? 'auxiliar' : 'médico'}`)}
             {oferta.zona ? ` · ${oferta.zona}` : ''}
             {oferta.tipo_jornada ? ` · ${oferta.tipo_jornada}` : ''}
+            {formatFranjaHoraria(oferta) ? ` · ${formatFranjaHoraria(oferta)}` : ''}
           </p>
           {oferta.tarifa != null && (
             <p className="text-[14px] font-semibold text-[#1A7A5E]">{formatCOP(oferta.tarifa)}</p>
+          )}
+          {oferta.procedimientos?.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {oferta.procedimientos.map((p) => (
+                <Badge key={p} tone="ok">
+                  {p}
+                </Badge>
+              ))}
+            </div>
           )}
           {oferta.turnos?.length > 0 && (
             <div className="flex flex-wrap gap-1">

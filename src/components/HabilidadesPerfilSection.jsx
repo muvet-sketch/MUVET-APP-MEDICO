@@ -65,6 +65,7 @@ export default function HabilidadesPerfilSection() {
         options={HABILIDADES_PROFESIONALES}
         value={profesionales}
         onChange={setProfesionales}
+        allowCustom
       />
 
       <ChipMultiSelect
@@ -72,6 +73,7 @@ export default function HabilidadesPerfilSection() {
         options={HABILIDADES_PERSONALES}
         value={personales}
         onChange={setPersonales}
+        allowCustom
       />
 
       {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}

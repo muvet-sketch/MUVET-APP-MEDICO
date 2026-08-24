@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
-import { supabase } from '../../lib/supabase';
 import { signOut } from '../../lib/auth';
 import {
   expirarSolicitudesVencidas,
@@ -11,42 +10,17 @@ import {
   subscribeNuevasSolicitudesPendientes,
 } from '../../lib/solicitudes';
 import ValidationBadge from './ValidationBadge';
-import DisponibleToggle from './DisponibleToggle';
 import QuickAccess from './QuickAccess';
 import ActivityFeed from './ActivityFeed';
 import { Card, Button, Toast, BottomNav, NotificationBell } from '../../components/ui';
 import N3Solicitudes from '../n3-solicitudes';
 
 export default function N2Home() {
-  const { perfil, refreshPerfil } = useAuth();
+  const { perfil } = useAuth();
   const navigate = useNavigate();
-  const [tieneServiciosConPrecio, setTieneServiciosConPrecio] = useState(false);
-  const [loadingServicios, setLoadingServicios] = useState(true);
   const [servicioActivo, setServicioActivo] = useState(null);
   const [solicitudPendiente, setSolicitudPendiente] = useState(null);
   const [toast, setToast] = useState({ visible: false, message: '', tone: 'info' });
-
-  useEffect(() => {
-    if (!perfil?.id) return;
-
-    let active = true;
-    setLoadingServicios(true);
-    supabase
-      .from('catalogo_servicios_medico')
-      .select('id', { count: 'exact', head: true })
-      .eq('medico_id', perfil.id)
-      .gt('precio', 0)
-      .then(({ count }) => {
-        if (active) {
-          setTieneServiciosConPrecio(Boolean(count && count > 0));
-          setLoadingServicios(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [perfil?.id]);
 
   // Mientras el médico tiene un servicio 'en_camino' activo, no debe recibir
   // ni procesar nuevas solicitudes.
@@ -118,14 +92,6 @@ export default function N2Home() {
     };
   }, [perfil?.id, perfil?.rol, perfil?.disponible, servicioActivo]);
 
-  async function handleToggleDisponible(nuevoValor) {
-    if (!perfil?.id) return;
-    const { error } = await supabase.from('perfiles').update({ disponible: nuevoValor }).eq('id', perfil.id);
-    if (!error) {
-      await refreshPerfil();
-    }
-  }
-
   function handleAceptada(servicio) {
     setSolicitudPendiente(null);
     navigate(`/constelacion/${servicio.id}`);
@@ -159,15 +125,6 @@ export default function N2Home() {
       </div>
 
       <ValidationBadge estadoValidacion={perfil.estado_validacion} />
-
-      {!loadingServicios && (
-        <DisponibleToggle
-          estadoValidacion={perfil.estado_validacion}
-          tieneServiciosConPrecio={tieneServiciosConPrecio}
-          disponible={perfil.disponible}
-          onToggle={handleToggleDisponible}
-        />
-      )}
 
       {servicioActivo && (
         <Card className="flex items-center justify-between gap-3">

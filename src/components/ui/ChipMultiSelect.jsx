@@ -13,6 +13,11 @@ import { useState } from 'react';
 // completa ni el modo `collapsible` (una sola fila) son navegables. No se
 // combina con `collapsible` — el buscador ya resuelve el mismo problema de
 // espacio de otra forma.
+//
+// `allowCustom`: agrega un campo de texto para sumar valores que no están en
+// `options` (p. ej. habilidades nuevas que el usuario quiere declarar). Los
+// valores custom ya elegidos se muestran como chips igual que los del
+// catálogo, aunque no estén en `options`.
 export default function ChipMultiSelect({
   label,
   hint,
@@ -22,18 +27,37 @@ export default function ChipMultiSelect({
   disabled = false,
   collapsible = false,
   searchable = false,
+  allowCustom = false,
 }) {
   const [expanded, setExpanded] = useState(!collapsible);
   const [busqueda, setBusqueda] = useState('');
+  const [nuevoValor, setNuevoValor] = useState('');
 
   function toggle(option) {
     if (disabled) return;
     onChange(value.includes(option) ? value.filter((v) => v !== option) : [...value, option]);
   }
 
-  const visibles = searchable
-    ? options.filter((o) => o.toLowerCase().includes(busqueda.trim().toLowerCase()))
+  function agregarCustom() {
+    if (disabled) return;
+    const v = nuevoValor.trim();
+    if (!v || value.includes(v)) {
+      setNuevoValor('');
+      return;
+    }
+    onChange([...value, v]);
+    setNuevoValor('');
+  }
+
+  // Une el catálogo con los valores custom ya elegidos (que no están en
+  // `options`) para que sus chips no desaparezcan de la lista.
+  const todasLasOpciones = allowCustom
+    ? [...options, ...value.filter((v) => !options.includes(v))]
     : options;
+
+  const visibles = searchable
+    ? todasLasOpciones.filter((o) => o.toLowerCase().includes(busqueda.trim().toLowerCase()))
+    : todasLasOpciones;
 
   // Las opciones ya elegidas se fijan al inicio de la lista (mismo orden del
   // catálogo entre ellas) para que no haya que buscarlas de nuevo entre las
@@ -82,6 +106,31 @@ export default function ChipMultiSelect({
         >
           {expanded ? 'Ver menos' : `Ver todas (${options.length})`}
         </button>
+      )}
+      {allowCustom && (
+        <div className="mt-2 flex gap-2">
+          <input
+            value={nuevoValor}
+            onChange={(e) => setNuevoValor(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                agregarCustom();
+              }
+            }}
+            disabled={disabled}
+            placeholder="Agregar nueva…"
+            className="flex-1 rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2 text-[13px] text-[#0A1628] outline-none focus:border-[#1A7A5E] disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={agregarCustom}
+            disabled={disabled}
+            className="shrink-0 rounded-[10px] border border-[#0A1628] px-3 py-2 text-[12px] font-medium text-[#0A1628] disabled:opacity-50"
+          >
+            + Agregar
+          </button>
+        </div>
       )}
     </div>
   );

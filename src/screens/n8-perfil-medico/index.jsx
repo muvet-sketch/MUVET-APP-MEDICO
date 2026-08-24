@@ -1,8 +1,6 @@
 import { useAuth } from '../../app/AuthContext';
 import { ScreenHeader, BottomNav } from '../../components/ui';
 import HeaderPerfil from './HeaderPerfil';
-import PlanCard from './PlanCard';
-import LogoFirmaSection from './LogoFirmaSection';
 import DatosProfesionalesSection from './DatosProfesionalesSection';
 import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
 import MatriculaSection from './MatriculaSection';
@@ -21,8 +19,10 @@ export default function N8PerfilMedico() {
 
       <div className="flex flex-col gap-5 px-5 pb-24">
         <HeaderPerfil perfil={perfil} />
-        <PlanCard />
-        <LogoFirmaSection />
+        {/* SUPUESTO: Plan activo y Logo/firma (D-552) ocultos por decisión de
+            producto para el lanzamiento inicial enfocado en Relevo. No se
+            elimina el código: PlanCard.jsx y LogoFirmaSection.jsx quedan
+            intactos para reactivarse en la iteración de domicilios. */}
         <DatosProfesionalesSection />
         <HabilidadesPerfilSection />
         <MatriculaSection />

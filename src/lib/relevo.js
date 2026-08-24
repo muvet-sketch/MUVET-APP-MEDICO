@@ -110,6 +110,10 @@ export async function crearPublicacion({
   fechaInicio,
   fechaFin,
   tipoJornada,
+  horaInicio,
+  horaFin,
+  duracionHoras,
+  procedimientos,
   tarifa,
   turnos,
   habilidades,
@@ -134,6 +138,10 @@ export async function crearPublicacion({
       fecha_inicio: fechaInicio || null,
       fecha_fin: fechaFin || null,
       tipo_jornada: tipoJornada || null,
+      hora_inicio: horaInicio || null,
+      hora_fin: horaFin || null,
+      duracion_horas: duracionHoras || duracionHoras === 0 ? duracionHoras : null,
+      procedimientos: procedimientos || [],
       tarifa: tarifa || tarifa === 0 ? tarifa : null,
       turnos: turnos || [],
       habilidades: habilidades || [],
@@ -271,6 +279,10 @@ export async function actualizarPublicacion(
     fechaInicio,
     fechaFin,
     tipoJornada,
+    horaInicio,
+    horaFin,
+    duracionHoras,
+    procedimientos,
     tarifa,
     turnos,
     habilidades,
@@ -287,6 +299,10 @@ export async function actualizarPublicacion(
       fecha_inicio: fechaInicio || null,
       fecha_fin: fechaFin || null,
       tipo_jornada: tipoJornada || null,
+      hora_inicio: horaInicio || null,
+      hora_fin: horaFin || null,
+      duracion_horas: duracionHoras || duracionHoras === 0 ? duracionHoras : null,
+      procedimientos: procedimientos || [],
       tarifa: tarifa || tarifa === 0 ? tarifa : null,
       turnos: turnos || [],
       habilidades: habilidades || [],
@@ -309,6 +325,59 @@ export async function actualizarPublicacion(
 export function normalizarCupos(cupos) {
   const n = Number(cupos);
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+}
+
+// Franja horaria (0021): la hora de fin se calcula en cliente a partir de
+// "hora de inicio" + "duración del turno" — el usuario nunca la escribe
+// directamente, así que cambiar la duración es lo que la mueve.
+// `hora` llega como "HH:MM" o "HH:MM:SS" (columna `time` de Postgres).
+export function formatHora(hora) {
+  return hora ? hora.slice(0, 5) : '';
+}
+
+export function formatDuracionHoras(horas) {
+  if (horas == null || horas === '') return '';
+  const total = Number(horas);
+  if (!Number.isFinite(total)) return '';
+  const h = Math.floor(total);
+  const m = Math.round((total - h) * 60);
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
+}
+
+// Envuelve a las 24h (un turno que empieza a las 22:00 con 8h de duración
+// termina a las 06:00 del día siguiente).
+export function sumarHoras(horaInicio, horas) {
+  if (!horaInicio || horas === '' || horas == null) return '';
+  const [h, m] = horaInicio.split(':').map(Number);
+  const duracionMin = Number(horas) * 60;
+  if (!Number.isFinite(h) || !Number.isFinite(m) || !Number.isFinite(duracionMin)) return '';
+  const totalMin = ((Math.round(h * 60 + m + duracionMin) % 1440) + 1440) % 1440;
+  const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
+  const mm = String(totalMin % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+// Inversa de sumarHoras (0022): la duración en horas ya no la escribe el
+// usuario, se deriva de inicio/fin al guardar — sigue viajando en
+// `duracion_horas` porque formatFranjaHoraria y los datos históricos ya
+// dependen de esa columna.
+export function calcularDuracionHoras(horaInicio, horaFin) {
+  if (!horaInicio || !horaFin) return null;
+  const [h1, m1] = horaInicio.split(':').map(Number);
+  const [h2, m2] = horaFin.split(':').map(Number);
+  if (![h1, m1, h2, m2].every(Number.isFinite)) return null;
+  const inicioMin = h1 * 60 + m1;
+  const finMin = h2 * 60 + m2 <= inicioMin ? h2 * 60 + m2 + 1440 : h2 * 60 + m2;
+  return Math.round(((finMin - inicioMin) / 60) * 100) / 100;
+}
+
+export function formatFranjaHoraria(publicacion) {
+  const inicio = formatHora(publicacion?.hora_inicio);
+  if (!inicio) return '';
+  const fin = formatHora(publicacion?.hora_fin) || sumarHoras(inicio, publicacion?.duracion_horas);
+  const duracion = formatDuracionHoras(publicacion?.duracion_horas);
+  return `${inicio}${fin ? `–${fin}` : ''}${duracion ? ` (${duracion})` : ''}`;
 }
 
 export function contarRelevosConfirmados(mensajes) {
@@ -404,6 +473,20 @@ export async function fetchMensajesRecibidos(autorId) {
     .order('created_at', { ascending: false });
   if (error) throw error;
   return adjuntarAutores(data ?? [], 'remitente_id', 'remitente');
+}
+
+// Ficha de contacto ampliada (0022): NIT/dirección/teléfono de la clínica, o
+// matrícula COMVEZCOL/estado de validación/especialidad/zona/bio/teléfono del
+// médico o auxiliar — lo que `perfiles_publico` (0014) deliberadamente no
+// expone a cualquier autenticado. `relevo_ficha_contacto` (security definer)
+// solo la devuelve si `perfilId` y quien pregunta ya intercambiaron un
+// mensaje de Relevo; si no hay relación, devuelve null y la UI cae de vuelta
+// a los datos básicos (nombre, rol) que ya trae `remitente`/`autorPublicacion`.
+export async function fetchFichaContacto(perfilId) {
+  if (!perfilId) return null;
+  const { data, error } = await supabase.rpc('relevo_ficha_contacto', { p_perfil_id: perfilId });
+  if (error) throw error;
+  return data?.[0] ?? null;
 }
 
 // Campana de notificaciones (N-26 · Mensajes). Cuenta mensajes recibidos que

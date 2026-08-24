@@ -59,10 +59,14 @@ export function tieneHabilidadesDePerfil(rol) {
   return ROLES_CON_HABILIDADES_DE_PERFIL.includes(rol);
 }
 
-// Descarta valores que ya no estén en el catálogo (p. ej. si el fundador
-// retira una entrada) para que la UI no muestre chips huérfanos.
-export function normalizarHabilidades(valores, catalogo) {
-  return (valores ?? []).filter((v) => catalogo.includes(v));
+// Limpia valores vacíos/duplicados. `catalogo` ya no se usa para descartar
+// entradas: desde que el perfil permite agregar habilidades nuevas (fuera del
+// catálogo cerrado), un valor ausente del catálogo puede ser legítimo — no un
+// huérfano de una entrada retirada. Se mantiene el parámetro para no romper
+// las llamadas existentes.
+export function normalizarHabilidades(valores, _catalogo) {
+  const limpios = (valores ?? []).map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean);
+  return [...new Set(limpios)];
 }
 
 export async function guardarHabilidadesPerfil(perfilId, { profesionales, personales }) {

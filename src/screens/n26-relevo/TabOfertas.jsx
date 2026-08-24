@@ -5,10 +5,12 @@ import {
   fetchPublicacionesActivas,
   fetchMisPostulaciones,
   fetchMensajesRecibidos,
+  fetchFichaContacto,
   enviarMensaje,
   decidirPostulacion,
   contarRelevosConfirmados,
   normalizarCupos,
+  formatFranjaHoraria,
 } from '../../lib/relevo';
 
 const ACTOR_BADGE = {
@@ -29,6 +31,53 @@ const ESTADO_BADGE = {
 // Pregunta previa (0019): no es una postulación, así que no usa el badge de
 // decisión de arriba.
 const CONSULTA_BADGE = { label: 'Consulta previa', tone: 'info' };
+
+// Mismo criterio de HeaderPerfil/MatriculaSection (N-8) para la matrícula
+// COMVEZCOL del médico, reutilizado aquí en la ficha de contacto (0022).
+const ESTADO_VALIDACION_BADGE = {
+  validado: { tone: 'ok', label: '✅ Vigente' },
+  pendiente: { tone: 'alert', label: '⏳ En validación' },
+  rechazado: { tone: 'critical', label: '❌ Rechazada' },
+};
+
+// Ficha de contacto ampliada (0022): datos que `perfiles_publico` no expone
+// a cualquier autenticado y que solo llegan aquí una vez que hay un mensaje
+// de por medio (ver fetchFichaContacto/relevo_ficha_contacto). `ficha` es
+// null mientras carga o si el backend no encuentra relación — en ese caso no
+// se muestra nada y el modal se queda con los datos básicos de siempre.
+function FichaContacto({ ficha, cargando }) {
+  if (cargando) return <p className="text-[12px] text-[#5A6B7A]">Cargando ficha…</p>;
+  if (!ficha) return null;
+
+  if (ficha.rol === 'clinica') {
+    if (!ficha.nit && !ficha.direccion_sede && !ficha.telefono) return null;
+    return (
+      <div className="flex flex-col gap-1 rounded-[10px] border border-[#E1E8ED] bg-[#F4F7F9] p-3">
+        <p className="text-[12px] font-semibold text-[#0A1628]">Datos de la clínica</p>
+        {ficha.nit && <p className="text-[12px] text-[#5A6B7A]">NIT: {ficha.nit}</p>}
+        {ficha.direccion_sede && <p className="text-[12px] text-[#5A6B7A]">Dirección: {ficha.direccion_sede}</p>}
+        {ficha.telefono && <p className="text-[12px] text-[#5A6B7A]">Tel: {ficha.telefono}</p>}
+      </div>
+    );
+  }
+
+  const estado = ESTADO_VALIDACION_BADGE[ficha.estado_validacion] ?? ESTADO_VALIDACION_BADGE.pendiente;
+  return (
+    <div className="flex flex-col gap-1.5 rounded-[10px] border border-[#E1E8ED] bg-[#F4F7F9] p-3">
+      <p className="text-[12px] font-semibold text-[#0A1628]">Ficha del perfil</p>
+      {ficha.matricula_comvezcol && (
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-[#5A6B7A]">Matrícula {ficha.matricula_comvezcol}</span>
+          <Badge tone={estado.tone}>{estado.label}</Badge>
+        </div>
+      )}
+      {ficha.especialidad && <p className="text-[12px] text-[#5A6B7A]">{ficha.especialidad}</p>}
+      {ficha.zona_cobertura && <p className="text-[12px] text-[#5A6B7A]">Zona: {ficha.zona_cobertura}</p>}
+      {ficha.bio && <p className="text-[12px] text-[#0A1628]">{ficha.bio}</p>}
+      {ficha.telefono && <p className="text-[12px] text-[#5A6B7A]">Tel: {ficha.telefono}</p>}
+    </div>
+  );
+}
 
 // La pestaña ya solo trae publicaciones dirigidas a mi rol (`rol_objetivo ===
 // perfil.rol`, ver cargar() más abajo), así que "Aceptar oferta" nunca queda
@@ -103,6 +152,8 @@ export default function TabOfertas({ perfil, rolInicial }) {
   const [solicitudes, setSolicitudes] = useState([]);
   const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
   const [detalle, setDetalle] = useState(null);
+  const [fichaDetalle, setFichaDetalle] = useState(null);
+  const [cargandoFicha, setCargandoFicha] = useState(false);
   const [respondiendo, setRespondiendo] = useState(null);
   const [respuesta, setRespuesta] = useState('');
   const [enviandoRespuesta, setEnviandoRespuesta] = useState(false);
@@ -160,6 +211,30 @@ export default function TabOfertas({ perfil, rolInicial }) {
     cargarSolicitudes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil.id]);
+
+  // Al abrir "Ver detalles" se pide la ficha ampliada (0022) — solo el
+  // backend sabe si ya hay un mensaje de por medio que la habilite.
+  useEffect(() => {
+    if (!detalle) {
+      setFichaDetalle(null);
+      return undefined;
+    }
+    let activo = true;
+    setCargandoFicha(true);
+    fetchFichaContacto(detalle.remitente_id)
+      .then((ficha) => {
+        if (activo) setFichaDetalle(ficha);
+      })
+      .catch(() => {
+        if (activo) setFichaDetalle(null);
+      })
+      .finally(() => {
+        if (activo) setCargandoFicha(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [detalle]);
 
   const idsPostulados = new Set(postulaciones.map((m) => m.publicacion_id));
   const visibles = publicaciones.filter((p) => {
@@ -301,12 +376,22 @@ export default function TabOfertas({ perfil, rolInicial }) {
                 {p.tipo === 'ofrezco' ? 'Ofrece disponibilidad' : `Busca ${p.rol_objetivo === 'auxiliar' ? 'auxiliar' : 'médico'}`}
                 {p.zona ? ` · ${p.zona}` : ''}
                 {p.tipo_jornada ? ` · ${p.tipo_jornada}` : ''}
+                {formatFranjaHoraria(p) ? ` · ${formatFranjaHoraria(p)}` : ''}
               </p>
               <p className="text-[11px] text-[#5A6B7A]">
                 {p.rol_objetivo ? `Dirigida a ${AUDIENCIA_LABEL[p.rol_objetivo] ?? p.rol_objetivo}` : ''}
                 {p.cupos > 1 ? `${p.rol_objetivo ? ' · ' : ''}${p.cupos} cupos` : ''}
               </p>
               {p.tarifa != null && <p className="text-[13px] font-semibold text-[#1A7A5E]">{formatCOP(p.tarifa)}</p>}
+              {p.procedimientos?.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {p.procedimientos.map((proc) => (
+                    <Badge key={proc} tone="ok">
+                      {proc}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               {p.turnos?.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {p.turnos.map((t) => (
@@ -429,9 +514,9 @@ export default function TabOfertas({ perfil, rolInicial }) {
               {detalle.remitente?.razon_social || detalle.remitente?.nombre_completo || 'Usuario MUVET'}
             </p>
             <p className="text-[12px] text-[#5A6B7A]">{ACTOR_LABEL[detalle.remitente?.rol] ?? ''}</p>
-            {detalle.remitente?.telefono && <p className="text-[12px] text-[#5A6B7A]">Tel: {detalle.remitente.telefono}</p>}
             <p className="text-[12px] text-[#5A6B7A]">Sobre: {detalle.publicacion?.descripcion || '(sin descripción)'}</p>
             <p className="text-[14px] text-[#0A1628]">{detalle.mensaje}</p>
+            <FichaContacto ficha={fichaDetalle} cargando={cargandoFicha} />
           </div>
         )}
       </Modal>
