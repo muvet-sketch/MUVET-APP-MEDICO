@@ -20,6 +20,9 @@ import N26Relevo from '../screens/n26-relevo';
 import N27CatalogoServicios from '../screens/n27-catalogo-servicios';
 import N28HomeSimplificado from '../screens/n28-home-simplificado';
 import N29PerfilClinica from '../screens/n29-perfil-clinica';
+import N30CoberturaServicio from '../screens/n30-cobertura-servicio';
+import ChatCobertura from '../screens/n30-cobertura-servicio/ChatCobertura';
+import Soporte from '../screens/soporte';
 
 export default function AppRouter() {
   return (
@@ -77,6 +80,15 @@ export default function AppRouter() {
       <Route path="/relevo" element={<ProtectedRoute><N26Relevo /></ProtectedRoute>} />
       <Route path="/servicios" element={<ProtectedRoute allowedRoles={['medico']}><N27CatalogoServicios /></ProtectedRoute>} />
       <Route path="/perfil-clinica" element={<ProtectedRoute allowedRoles={['clinica']}><N29PerfilClinica /></ProtectedRoute>} />
+      {/* Cobertura de Servicio: función nueva médico↔médico (distinta de Relevo/N-26).
+          Ver supabase/migrations/0023_cobertura_servicio.sql para el detalle y la
+          excepción explícita a D-540 (chat en tiempo real) confirmada con el fundador. */}
+      <Route path="/cobertura-servicio" element={<ProtectedRoute allowedRoles={['medico']}><N30CoberturaServicio /></ProtectedRoute>} />
+      <Route path="/cobertura-servicio/chat/:solicitudId" element={<ProtectedRoute allowedRoles={['medico']}><ChatCobertura /></ProtectedRoute>} />
+      {/* Soporte: abierta a los 3 actores. Es además la pantalla donde aterriza
+          quien quedó bloqueado por posible suplantación (0025) — ProtectedRoute
+          redirige aquí todo lo demás mientras dure la controversia. */}
+      <Route path="/soporte" element={<ProtectedRoute><Soporte /></ProtectedRoute>} />
     </Routes>
   );
 }

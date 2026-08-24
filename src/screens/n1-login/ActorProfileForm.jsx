@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { uploadDocumento } from '../../lib/storage';
+import { verificarMatriculaComvezcol } from '../../lib/verificacionComvezcol';
 
 const ROLES = [
   { value: 'medico', label: 'Médico Veterinario' },
@@ -54,7 +55,9 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
         telefono,
         zona_cobertura: rol !== 'clinica' ? zonaCobertura : null,
         especialidad: rol === 'medico' ? especialidad : null,
-        matricula_comvezcol: rol === 'medico' ? matriculaComvezcol : null,
+        // trim: la detección de matrícula duplicada compara el valor exacto,
+        // así que un espacio de sobra la esquivaría.
+        matricula_comvezcol: rol === 'medico' ? matriculaComvezcol.trim() : null,
         carne_url: carneUrl,
         estado_validacion: rol === 'medico' ? 'pendiente' : null,
         razon_social: rol === 'clinica' ? razonSocial : null,
@@ -64,6 +67,20 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
 
       const { error: insertError } = await supabase.from('perfiles').insert(perfilRow);
       if (insertError) throw insertError;
+
+      // Verificación automática contra el registro público del Consejo. Va en
+      // su propio try/catch a propósito: el perfil ya quedó creado en
+      // 'pendiente', así que si el registro externo está caído o tarda, el
+      // registro del médico NO se cae con él — solo significa que la
+      // validación la hará una persona (respaldo manual, plazo ≤24h).
+      if (rol === 'medico') {
+        try {
+          await verificarMatriculaComvezcol();
+        } catch {
+          // Silencioso por diseño: no hay nada que el médico pueda hacer al
+          // respecto y su perfil ya está creado.
+        }
+      }
 
       onProfileCreated(rol);
     } catch (err) {
@@ -160,7 +177,8 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
               className="w-full rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2.5 text-[14px]"
             />
             <p className="mt-1 text-[12px] text-[#5A6B7A]">
-              Tu matrícula será validada manualmente en un plazo de hasta 24 horas.
+              Verificamos tu matrícula contra el registro del Consejo apenas termines. Si no podemos
+              confirmarla automáticamente, la validamos a mano en un plazo de hasta 24 horas.
             </p>
           </div>
           <Input

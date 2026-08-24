@@ -42,8 +42,31 @@ Violar cualquiera de estas reglas invalida el trabajo entregado.
   fecha/hora, sin GPS.
 - **D-536** — N-4 sin GPS ni mapa interno. Única navegación permitida: deep
   link a la app de mapas nativa del dispositivo.
-- **D-541** — Validación COMVEZCOL manual, con plazo ≤24h. Sin matrícula
-  validada el médico **no puede** activar disponibilidad.
+- **D-541** — Sin matrícula COMVEZCOL validada el médico **no puede** activar
+  disponibilidad. La validación se automatiza contra el registro público del
+  Consejo (Edge Function `verificar-comvezcol`) y solo se aprueba sola ante
+  coincidencia inequívoca: matrícula numérica, **una** fila, matrícula
+  confirmada en la página de detalle y nombre concordante. La automatización
+  **nunca** escribe `rechazado`: rechazar es siempre una decisión humana.
+  `estado_validacion` y `fecha_validacion` solo los escribe el service role
+  (trigger `fn_proteger_estado_validacion`); el cliente no puede auto-validarse
+  ni activar `disponible` sin estar validado. Tres desenlaces:
+  - `validado` — puede activar DISPONIBLE.
+  - **`en_disputa`** — posible suplantación: la matrícula ya está en otra
+    cuenta de MUVET, o existe en el Consejo a nombre de otra persona. Queda
+    **bloqueado**: solo puede actualizar su perfil y escribir a soporte
+    (`/soporte`). El bloqueo es de backend (RLS + `perfil_en_disputa()`), no
+    solo de UI. Solo una persona lo saca de ahí.
+  - `pendiente` — no se pudo verificar por cualquier otra razón. Usa la app
+    con normalidad mientras se valida **a mano, con plazo ≤24h** (pero sigue
+    sin poder activar DISPONIBLE).
+
+  *Modificación al D-541 original ("validación manual") confirmada con el
+  fundador — ver `supabase/migrations/0024` y `0025`.*
+- **Revisión manual de matrículas** — la bandeja es la vista
+  `revision_matriculas_pendientes` (Supabase Dashboard → SQL Editor). No es
+  legible por los usuarios de la app. Aviso opcional por correo si se
+  configuran los secrets `RESEND_API_KEY` y `SOPORTE_EMAIL`.
 - **D-550** — El toggle DISPONIBLE queda bloqueado hasta que el médico
   configure al menos un servicio con precio > 0 en N-27.
 - **D-539** — Sustancias controladas → aviso al médico (Resolución 1478/2006

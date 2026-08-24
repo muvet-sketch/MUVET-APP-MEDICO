@@ -3,12 +3,15 @@ import { useAuth } from '../../app/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { uploadDocumento, useSignedUrl } from '../../lib/storage';
 import { validateImageFile } from '../../lib/fileValidation';
+import { verificarMatriculaComvezcol, RESULTADO_VALIDADO } from '../../lib/verificacionComvezcol';
 import { Card, Badge, Input, Button, Toast } from '../../components/ui';
 
 const ESTADO_BADGE = {
   validado: { tone: 'ok', label: '✅ Vigente' },
   pendiente: { tone: 'alert', label: '⏳ En validación (≤24h)' },
   rechazado: { tone: 'critical', label: '❌ Rechazada — contacta soporte' },
+  // 0025: posible suplantación (matrícula ajena o ya registrada en otra cuenta).
+  en_disputa: { tone: 'critical', label: '⚠️ En verificación — contacta soporte' },
 };
 
 // D-541: cualquier cambio de matrícula/carné vuelve el estado a 'pendiente' y requiere nueva validación manual.
@@ -58,20 +61,42 @@ export default function MatriculaSection() {
         carneUrl = path;
       }
 
+      // `estado_validacion` NO se manda desde el cliente: el trigger de 0025
+      // lo rechaza (solo la Edge Function lo escribe) y él mismo se encarga de
+      // devolverlo a 'pendiente' cuando cambia la matrícula o el carné.
       const { error: updateError } = await supabase
         .from('perfiles')
         .update({
           matricula_comvezcol: matricula.trim(),
           carne_url: carneUrl,
-          estado_validacion: 'pendiente',
         })
         .eq('id', perfil.id);
       if (updateError) throw updateError;
 
-      await refreshPerfil();
       setEditing(false);
       setCarneFile(null);
-      showToast('Matrícula enviada a validación.', 'ok');
+
+      // Verificación automática contra el registro del Consejo. Su fallo no
+      // debe presentarse como fallo del guardado: la matrícula ya quedó
+      // guardada y en 'pendiente', que es exactamente el estado del respaldo
+      // manual.
+      let resultado = null;
+      try {
+        resultado = (await verificarMatriculaComvezcol())?.resultado ?? null;
+      } catch {
+        resultado = null;
+      }
+
+      // refreshPerfil va DESPUÉS de verificar para que el badge muestre
+      // 'validado' de una vez cuando la verificación automática funcionó.
+      await refreshPerfil();
+
+      showToast(
+        resultado === RESULTADO_VALIDADO
+          ? 'Matrícula verificada con el Consejo.'
+          : 'Matrícula enviada a validación (≤24h).',
+        'ok',
+      );
     } catch (err) {
       setError(err.message ?? 'No se pudo actualizar la matrícula.');
     } finally {
@@ -93,9 +118,19 @@ export default function MatriculaSection() {
             <Badge tone={estado.tone}>{estado.label}</Badge>
           </div>
 
-          {/* SUPUESTO: `perfiles` no tiene columna de fecha de validación en el esquema
-              actual (0001/0002); se omite la fecha exacta hasta que se defina.
-              TODO Fase posterior: agregar columna fecha_validacion si el fundador lo requiere. */}
+          {/* fecha_validacion la agrega la migración 0024 (resuelve el SUPUESTO que
+              estaba anotado acá); la escribe tanto la verificación automática como
+              una validación hecha a mano. */}
+          {perfil?.estado_validacion === 'validado' && perfil?.fecha_validacion ? (
+            <p className="text-[12px] text-[#5A6B7A]">
+              Validada el{' '}
+              {new Date(perfil.fecha_validacion).toLocaleDateString('es-CO', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </p>
+          ) : null}
 
           {signedCarneUrl ? (
             <img src={signedCarneUrl} alt="Carné COMVEZCOL" className="w-full rounded-[10px] border border-[#E1E8ED]" />
@@ -123,7 +158,8 @@ export default function MatriculaSection() {
             />
           </div>
           <p className="text-[12px] text-[#5A6B7A]">
-            Cualquier cambio vuelve tu estado a "En validación" (plazo ≤24h).
+            Cualquier cambio vuelve tu estado a "En validación": verificamos la matrícula contra el
+            registro del Consejo y, si no podemos confirmarla, la revisa una persona (plazo ≤24h).
           </p>
 
           {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}

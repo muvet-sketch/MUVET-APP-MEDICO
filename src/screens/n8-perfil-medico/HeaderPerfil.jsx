@@ -6,6 +6,8 @@ const ESTADO_BADGE = {
   validado: { tone: 'ok', label: '✅ Vigente' },
   pendiente: { tone: 'alert', label: '⏳ En validación' },
   rechazado: { tone: 'critical', label: '❌ Rechazada' },
+  // 0025: posible suplantación (matrícula ajena o ya registrada en otra cuenta).
+  en_disputa: { tone: 'critical', label: '⚠️ En verificación' },
 };
 
 export default function HeaderPerfil({ perfil }) {
