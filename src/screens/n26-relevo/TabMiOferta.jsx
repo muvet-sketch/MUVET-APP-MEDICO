@@ -771,7 +771,7 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, conversaciones, o
 // La sección "Ofertas anteriores en esta pestaña" también se retiró: las
 // ofertas canceladas o finalizadas (0018: ambas terminales) están en el
 // historial único de /historial (N-9), junto a las conversaciones cerradas y
-// al historial de Cobertura de Servicio. Ver lib/historialUnificado.js.
+// al historial de MUVET Relevo (N-30). Ver lib/historialUnificado.js.
 
 export default function TabMiOferta({ perfil }) {
   // El formulario puede escribir las habilidades de catálogo en `perfiles`

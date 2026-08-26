@@ -1,4 +1,4 @@
-// Chat en tiempo real de Cobertura de Servicio — EXCEPCIÓN EXPLÍCITA a D-540
+// Chat en tiempo real de MUVET Relevo (N-30) — EXCEPCIÓN EXPLÍCITA a D-540
 // / "no incluir chat en tiempo real" (CLAUDE.md), confirmada con el fundador
 // y acotada a este módulo (ver supabase/migrations/0023_cobertura_servicio.sql).
 // Activo solo mientras la solicitud está en estado 'cubierta' — al finalizar
@@ -154,7 +154,7 @@ export default function ChatCobertura() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title={contraparte?.nombre_completo ? `Chat con ${contraparte.nombre_completo}` : 'Chat de cobertura'} fallbackTo="/cobertura-servicio" />
+      <ScreenHeader title={contraparte?.nombre_completo ? `Chat con ${contraparte.nombre_completo}` : 'Chat de cobertura'} fallbackTo="/cobertura-servicio" conCampana />
 
       <div className="border-b border-[#E1E8ED] px-5 py-2">
         <p className="text-[12px] text-[#5A6B7A]">{solicitud.tipo_servicio}</p>

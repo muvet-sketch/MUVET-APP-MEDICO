@@ -3,6 +3,7 @@ import { useAuth } from '../../app/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Card, Input, Button, Toast, ChipMultiSelect } from '../../components/ui';
 import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
+import { NOMBRE_TURNOS } from '../../lib/nombresModulos';
 
 // SUPUESTO: el Auxiliar no tiene una pantalla de perfil propia con número de
 // pantalla asignado (a diferencia de N-29 para Clínica) — el despacho de
@@ -61,7 +62,7 @@ export default function PerfilAuxiliarInline({ onClose }) {
         <ChipMultiSelect
           searchable
           label={`Zona de cobertura (${zonas.length})`}
-          hint="También filtra las ofertas que ves en MUVET Relevo."
+          hint={`También filtra las ofertas que ves en ${NOMBRE_TURNOS}.`}
           options={ZONAS_COBERTURA}
           value={zonas}
           onChange={setZonas}

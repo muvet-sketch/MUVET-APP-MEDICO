@@ -23,7 +23,7 @@ export const MOCK_ACTIVIDAD_RECIENTE = [
   {
     id: 'mock-3',
     tipo: 'relevo_mensaje',
-    titulo: 'Mensaje de MUVET Relevo',
+    titulo: 'Mensaje de MUVET Turnos',
     descripcion: '"¿Puedes cubrir turno mañana en zona norte?"',
     fecha: '2026-07-16T09:00:00-05:00',
   },

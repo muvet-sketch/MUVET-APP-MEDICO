@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-// Catálogos cerrados de habilidades para MUVET Relevo (migración 0015).
+// Catálogos cerrados de habilidades para MUVET Turnos (migración 0015).
 // Definidos por el fundador — no inventar, reordenar ni traducir entradas.
 //
 // Quién las usa:

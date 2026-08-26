@@ -8,6 +8,7 @@ import {
   normalizarHabilidades,
 } from '../lib/habilidades';
 import { sincronizarHabilidadesPublicaciones } from '../lib/relevo';
+import { NOMBRE_TURNOS } from '../lib/nombresModulos';
 
 // Configuración de habilidades del usuario (migración 0015). La usan médico
 // (N-8) y auxiliar (perfil inline de N-28) — la clínica no la tiene, porque
@@ -55,8 +56,7 @@ export default function HabilidadesPerfilSection() {
       <div>
         <p className="text-[14px] font-semibold text-[#0A1628]">Habilidades</p>
         <p className="mt-1 text-[12px] text-[#5A6B7A]">
-          Quedan activas en tu oferta de MUVET Relevo cada vez que la creas o la publicas. También puedes ajustarlas al
-          editar la oferta.
+          {`Quedan activas en tu oferta de ${NOMBRE_TURNOS} cada vez que la creas o la publicas. También puedes ajustarlas al editar la oferta.`}
         </p>
       </div>
 

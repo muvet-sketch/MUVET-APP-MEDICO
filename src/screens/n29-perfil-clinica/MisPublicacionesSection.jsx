@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '../../components/ui';
 import { fetchMisPublicaciones } from '../../lib/relevo';
+import { NOMBRE_TURNOS } from '../../lib/nombresModulos';
 
 export default function MisPublicacionesSection({ perfil }) {
   const [publicaciones, setPublicaciones] = useState([]);
@@ -22,7 +23,7 @@ export default function MisPublicacionesSection({ perfil }) {
 
   return (
     <Card className="flex flex-col gap-2">
-      <p className="text-[14px] font-semibold text-[#0A1628]">Publicaciones activas en Relevo</p>
+      <p className="text-[14px] font-semibold text-[#0A1628]">{`Publicaciones activas en ${NOMBRE_TURNOS}`}</p>
       {loading && <p className="text-[12px] text-[#5A6B7A]">Cargando…</p>}
       {!loading && publicaciones.length === 0 && <p className="text-[12px] text-[#5A6B7A]">Sin publicaciones activas.</p>}
       {!loading &&

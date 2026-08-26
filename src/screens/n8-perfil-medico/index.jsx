@@ -15,7 +15,7 @@ export default function N8PerfilMedico() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title="Mi Perfil" />
+      <ScreenHeader title="Mi Perfil" conCampana />
 
       <div className="flex flex-col gap-5 px-5 pb-24">
         <HeaderPerfil perfil={perfil} />

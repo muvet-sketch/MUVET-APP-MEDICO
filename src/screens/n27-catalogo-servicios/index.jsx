@@ -73,7 +73,7 @@ export default function N27CatalogoServicios() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title="Mis Domicilios" />
+      <ScreenHeader title="Mis Domicilios" conCampana />
 
       {!loadingServicios && perfil && (
         <div className="px-5 pt-4">

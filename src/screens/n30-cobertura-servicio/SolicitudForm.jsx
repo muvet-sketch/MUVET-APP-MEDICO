@@ -23,7 +23,7 @@ function Select({ label, value, onChange, options, placeholder }) {
   );
 }
 
-// Formulario de nueva solicitud de Cobertura de Servicio: el médico describe
+// Formulario de nueva solicitud de MUVET Relevo (N-30): el médico describe
 // el servicio que no puede atender para que otro médico pueda ofrecerse a
 // cubrirlo. Campos pedidos: tipo de servicio, zona/perímetro, especie, raza,
 // temperamento (+ fecha/hora y descripción libre para dar contexto).

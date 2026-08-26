@@ -67,9 +67,9 @@ export default function AppRouter() {
       <Route path="/soap/:servicioId" element={<ProtectedRoute allowedRoles={['medico']}><N15Soap /></ProtectedRoute>} />
       <Route path="/cierre/:servicioId" element={<ProtectedRoute allowedRoles={['medico']}><N19CierreServicio /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute allowedRoles={['medico']}><N8PerfilMedico /></ProtectedRoute>} />
-      {/* /historial: historial único de Cobertura de Servicio + MUVET Relevo.
-          Abierta a los 3 actores, igual que /relevo — un auxiliar o una clínica
-          también acumulan ofertas y postulaciones cerradas. Lo de Cobertura
+      {/* /historial: historial único de MUVET Relevo + MUVET Turnos. Abierta a
+          los 3 actores, igual que /relevo — un auxiliar o una clínica también
+          acumulan ofertas y conversaciones cerradas. Lo de MUVET Relevo
           (médico↔médico) simplemente les vuelve vacío. El historial de
           DOMICILIOS ya no está aquí: vive en /servicios (N-27). */}
       <Route path="/historial" element={<ProtectedRoute><N9Historial /></ProtectedRoute>} />
@@ -83,7 +83,9 @@ export default function AppRouter() {
       <Route path="/seguimientos" element={<ProtectedRoute allowedRoles={['medico']}><Seguimientos /></ProtectedRoute>} />
       <Route path="/recomendaciones/:servicioId" element={<ProtectedRoute allowedRoles={['medico']}><N18Recomendaciones /></ProtectedRoute>} />
       <Route path="/vacunas/:mascotaId" element={<ProtectedRoute allowedRoles={['medico']}><VacunasDesparasitaciones /></ProtectedRoute>} />
-      {/* /relevo: abierta a los 3 tipos de actor (D-540/D-545). El hilo de
+      {/* /relevo = MUVET Turnos en la UI (la bolsa gremial), NO "MUVET Relevo",
+          que es /cobertura-servicio. Ver lib/nombresModulos.js.
+          Abierta a los 3 tipos de actor (D-540/D-545). El hilo de
           negociación va en ruta propia para que las notificaciones de 0027
           puedan hacer deep-link a una conversación concreta; quién puede
           abrirla lo decide la RLS de relevo_conversaciones, no el router
@@ -92,15 +94,20 @@ export default function AppRouter() {
       <Route path="/relevo/conversacion/:conversacionId" element={<ProtectedRoute><ConversacionRelevo /></ProtectedRoute>} />
       <Route path="/servicios" element={<ProtectedRoute allowedRoles={['medico']}><N27CatalogoServicios /></ProtectedRoute>} />
       <Route path="/perfil-clinica" element={<ProtectedRoute allowedRoles={['clinica']}><N29PerfilClinica /></ProtectedRoute>} />
-      {/* Cobertura de Servicio: función nueva médico↔médico (distinta de Relevo/N-26).
+      {/* MUVET Relevo (N-30): médico↔médico, pasar un servicio ya agendado.
+          ⚠️ La ruta conserva el nombre viejo del módulo, "cobertura-servicio":
+          en la UI esto es "MUVET Relevo" y /relevo es "MUVET Turnos". No es un
+          error — ver el bloque de lib/nombresModulos.js.
           Ver supabase/migrations/0023_cobertura_servicio.sql para el detalle y la
           excepción explícita a D-540 (chat en tiempo real) confirmada con el fundador. */}
       <Route path="/cobertura-servicio" element={<ProtectedRoute allowedRoles={['medico']}><N30CoberturaServicio /></ProtectedRoute>} />
       <Route path="/cobertura-servicio/chat/:solicitudId" element={<ProtectedRoute allowedRoles={['medico']}><ChatCobertura /></ProtectedRoute>} />
       {/* N-31: Notificaciones (migración 0026). Abierta a los 3 actores, igual
-          que /relevo y /historial — las notificaciones de Relevo le llegan a
-          cualquiera de ellos; las de Cobertura (médico↔médico) simplemente no
-          existen para auxiliar ni clínica. */}
+          que /relevo y /historial — las notificaciones de MUVET Turnos le
+          llegan a cualquiera de ellos; las de MUVET Relevo (médico↔médico)
+          simplemente no existen para auxiliar ni clínica.
+          Ya no hay pestaña "Alertas" en BottomNav: aquí se llega por la campana
+          del header (ScreenHeader conCampana) y la de los dos Home. */}
       <Route path="/notificaciones" element={<ProtectedRoute><N31Notificaciones /></ProtectedRoute>} />
       {/* Soporte: abierta a los 3 actores. Es además la pantalla donde aterriza
           quien quedó bloqueado por posible suplantación (0025) — ProtectedRoute

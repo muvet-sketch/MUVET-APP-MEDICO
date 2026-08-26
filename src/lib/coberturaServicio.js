@@ -1,7 +1,9 @@
 import { supabase } from './supabase';
 
-// Cobertura de Servicio — función nueva, médico↔médico (distinta de MUVET
-// Relevo / N-26). Un médico que no puede atender un servicio ya agendado
+// MUVET Relevo (N-30) — médico↔médico. El módulo y sus tablas conservan el
+// nombre viejo, `cobertura`; el que se llama `relevo` en el código es MUVET
+// Turnos (N-26). Ver el bloque de lib/nombresModulos.js.
+// Un médico que no puede atender un servicio ya agendado
 // publica una solicitud con los detalles; otro médico puede ofrecerse a
 // cubrirlo. Al ofrecerse, ambos acceden a un chat en tiempo real (con
 // archivos/imágenes) activo solo mientras dura el servicio. Esquema, RLS y

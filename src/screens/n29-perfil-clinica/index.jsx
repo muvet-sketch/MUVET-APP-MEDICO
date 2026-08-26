@@ -12,7 +12,7 @@ export default function N29PerfilClinica() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title="Mi Clínica" fallbackTo="/home-simplificado" />
+      <ScreenHeader title="Mi Clínica" fallbackTo="/home-simplificado" conCampana />
       <div className="flex flex-col gap-5 px-5 pb-24">
         <HeaderPerfilClinica perfil={perfil} />
         <DatosClinicaSection />

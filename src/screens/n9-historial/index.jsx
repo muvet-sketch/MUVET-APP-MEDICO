@@ -1,5 +1,6 @@
-// N-9 · Historial único: Cobertura de Servicio + MUVET Relevo, en una sola
-// lista cronológica.
+// N-9 · Historial único: MUVET Relevo (N-30) + MUVET Turnos (N-26), en una
+// sola lista cronológica. Los identificadores internos van al revés que los
+// nombres — ver el bloque de lib/nombresModulos.js.
 //
 // Antes esta pantalla era el historial de DOMICILIOS (servicios cerrados +
 // expediente de solo lectura). Ese contenido se movió completo a su propio
@@ -47,7 +48,7 @@ export default function N9Historial() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title="Historial" fallbackTo={perfil?.rol === 'medico' ? '/home' : '/home-simplificado'} />
+      <ScreenHeader title="Historial" fallbackTo={perfil?.rol === 'medico' ? '/home' : '/home-simplificado'} conCampana />
 
       <div className="flex flex-1 flex-col gap-3 px-5 py-5 pb-24">
         <div className="flex gap-2">

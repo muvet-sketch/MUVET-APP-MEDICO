@@ -74,7 +74,7 @@ export default function Soporte() {
           está vedado, así que el header con flecha atrás solo se muestra a
           quien entró a soporte por su cuenta. */}
       {!bloqueado ? (
-        <ScreenHeader title="Soporte" />
+        <ScreenHeader title="Soporte" conCampana />
       ) : (
         <div className="sticky top-0 z-10 border-b border-[#E1E8ED] bg-white px-5 py-4">
           <h1 className="text-[16px] font-semibold text-[#0A1628]">Soporte</h1>

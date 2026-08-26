@@ -133,7 +133,7 @@ export default function N19CierreServicio() {
           <Button onClick={() => navigate('/home')}>Ir al inicio</Button>
           {/* El expediente cerrado vive ahora en N-27 · Mis Domicilios (el
               módulo de domicilios quedó autocontenido); /historial pasó a ser
-              el historial único de Cobertura de Servicio + Relevo. */}
+              el historial único de MUVET Relevo + MUVET Turnos. */}
           <Button variant="outline" onClick={() => navigate(`/servicios?servicio=${resultado.id}`)}>
             Ver expediente cerrado
           </Button>

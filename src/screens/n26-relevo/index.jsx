@@ -37,7 +37,7 @@ export default function N26Relevo() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title={NOMBRE_TURNOS} fallbackTo={perfil.rol === 'medico' ? '/home' : '/home-simplificado'} />
+      <ScreenHeader title={NOMBRE_TURNOS} fallbackTo={perfil.rol === 'medico' ? '/home' : '/home-simplificado'} conCampana />
 
       <div className="sticky top-[57px] z-10 flex border-b border-[#E1E8ED] bg-white px-5">
         {TABS.map((t) => (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../app/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Card, Toggle } from '../../components/ui';
+import { CORTO_TURNOS } from '../../lib/nombresModulos';
 
 export default function NotificacionesSection() {
   const { perfil, refreshPerfil } = useAuth();
@@ -29,12 +30,14 @@ export default function NotificacionesSection() {
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-[14px] text-[#0A1628]">Mensajes de Relevo</p>
+        {/* La columna sigue llamándose `notif_relevo` porque es el
+            identificador interno de MUVET Turnos — ver lib/nombresModulos.js. */}
+        <p className="text-[14px] text-[#0A1628]">{`Mensajes de ${CORTO_TURNOS}`}</p>
         <Toggle
           checked={Boolean(perfil?.notif_relevo)}
           disabled={updating === 'notif_relevo'}
           onChange={(v) => handleToggle('notif_relevo', v)}
-          label="Notificaciones de mensajes de Relevo"
+          label={`Notificaciones de mensajes de ${CORTO_TURNOS}`}
         />
       </div>
     </Card>

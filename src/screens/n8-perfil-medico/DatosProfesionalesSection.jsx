@@ -6,6 +6,7 @@ import { validateImageFile } from '../../lib/fileValidation';
 import { getInitials } from '../../lib/format';
 import { Card, Input, Button, Toast, ChipMultiSelect } from '../../components/ui';
 import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
+import { NOMBRE_TURNOS } from '../../lib/nombresModulos';
 
 const BIO_MAX = 200;
 
@@ -129,7 +130,7 @@ export default function DatosProfesionalesSection() {
       <ChipMultiSelect
         searchable
         label={`Zonas de cobertura (${zonas.length})`}
-        hint="También filtran las ofertas que ves en MUVET Relevo."
+        hint={`También filtran las ofertas que ves en ${NOMBRE_TURNOS}.`}
         options={ZONAS_COBERTURA}
         value={zonas}
         onChange={setZonas}

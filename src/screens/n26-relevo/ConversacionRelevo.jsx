@@ -224,7 +224,7 @@ export default function ConversacionRelevo() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title={nombreOtro} fallbackTo="/relevo?tab=mensajes" />
+      <ScreenHeader title={nombreOtro} fallbackTo="/relevo?tab=mensajes" conCampana />
 
       <div className="flex flex-col gap-3 px-5 py-4">
         <Card className="flex flex-col gap-2">

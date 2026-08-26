@@ -5,7 +5,8 @@
 MUVET es una plataforma colombiana de telemedicina veterinaria. Este repositorio
 es la **App Médico**: la herramienta de trabajo del médico veterinario en campo,
 que gestiona el flujo completo de consulta domiciliaria (de la solicitud al
-cierre con historia clínica) y se conecta a **MUVET Relevo** (red gremial).
+cierre con historia clínica) y se conecta a **MUVET Turnos** (bolsa gremial) y
+**MUVET Relevo** (médico↔médico).
 
 - **MVP:** v1.2 · 18 pantallas
 - **Registro clínico:** 100% manual
@@ -18,9 +19,9 @@ supabase-js + react-router-dom. Backend: Supabase (Auth + Postgres + Storage +
 RLS). Deploy: Vercel. Versionado: GitHub.
 
 **Actores (3):**
-- **Médico Veterinario** → flujo clínico completo + Relevo
-- **Auxiliar Veterinario** → solo Relevo + Home simplificado
-- **Clínica Veterinaria** → solo Relevo + Perfil clínica
+- **Médico Veterinario** → flujo clínico completo + Turnos + Relevo
+- **Auxiliar Veterinario** → solo Turnos + Home simplificado
+- **Clínica Veterinaria** → solo Turnos + Perfil clínica
 
 ---
 
@@ -108,6 +109,18 @@ Nomenclatura canónica. Prohibido inventar términos alternativos.
   el MVP.** No existen ZamenIA, Hermes, Hugin, HygeIA como sistemas de este
   producto.
 - **Pasarela de pagos futura:** Siigo Pay (nunca Wompi). No entra en el MVP.
+- **⚠️ Los dos módulos gremiales — nombres visibles ≠ identificadores.** Los
+  nombres se intercambiaron y el código NO se renombró. Antes de escribir una
+  línea sobre cualquiera de los dos, leer `src/lib/nombresModulos.js`:
+
+  | UI | Pantalla | Ruta | Lib / tablas |
+  |---|---|---|---|
+  | **MUVET Turnos** — bolsa gremial multi-rol | N-26 | `/relevo` | `lib/relevo.js`, `relevo_*` |
+  | **MUVET Relevo** — médico↔médico, pasar un servicio | N-30 | `/cobertura-servicio` | `lib/coberturaServicio.js`, `cobertura_*` |
+
+  Un chip etiquetado "Relevo" cuyo `value` es `'cobertura'` **es correcto**.
+  Nombres anteriores, ya retirados de la UI: "MUVET Relevo" para N-26 y
+  "Cobertura de Servicio" para N-30.
 - **"Constelación"** = interfaz durante la consulta activa (pantalla N-4).
 - **"Barra Trueta"** = barra de navegación persistente de la Constelación. Es
   un **componente**, no una pantalla independiente.
