@@ -1,10 +1,19 @@
+// N-27 · Mis Domicilios. Módulo autocontenido de la atención domiciliaria:
+// disponibilidad, servicios en curso, actividad reciente, historial de
+// servicios cerrados (con su expediente de solo lectura) y catálogo de
+// tarifas. El lanzamiento inicial va con Cobertura y Relevo, así que todo lo
+// de domicilios vive aquí y no aparece en los demás módulos — el historial de
+// domicilios salió de N-9 (ahora historial único de Cobertura + Relevo) y
+// quedó agrupado bajo "Actividad reciente" en la pestaña "Activos".
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { ScreenHeader } from '../../components/ui';
 import DisponibleToggle from '../n2-home/DisponibleToggle';
 import TabActivos from './TabActivos';
 import TabServicios from './TabServicios';
+import DetalleServicio from './DetalleServicio';
 
 const TABS = [
   { key: 'activos', label: 'Activos' },
@@ -13,9 +22,15 @@ const TABS = [
 
 export default function N27CatalogoServicios() {
   const { perfil, refreshPerfil } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState('activos');
   const [tieneServiciosConPrecio, setTieneServiciosConPrecio] = useState(false);
   const [loadingServicios, setLoadingServicios] = useState(true);
+
+  // `?servicio=<id>` abre el expediente cerrado directo, sin ruta nueva —
+  // mismo patrón que usaba N-9 antes de la reorganización. Lo usa el botón
+  // "Ver expediente cerrado" de N-19 (cierre de servicio).
+  const servicioSeleccionado = searchParams.get('servicio');
 
   useEffect(() => {
     if (!perfil?.id) return undefined;
@@ -45,6 +60,15 @@ export default function N27CatalogoServicios() {
     if (!error) {
       await refreshPerfil();
     }
+  }
+
+  if (servicioSeleccionado) {
+    return (
+      <DetalleServicio
+        servicioId={servicioSeleccionado}
+        onVolver={() => setSearchParams({}, { replace: true })}
+      />
+    );
   }
 
   return (
@@ -78,7 +102,7 @@ export default function N27CatalogoServicios() {
         ))}
       </div>
 
-      {tab === 'activos' ? <TabActivos /> : <TabServicios />}
+      {tab === 'activos' ? <TabActivos perfil={perfil} /> : <TabServicios />}
     </div>
   );
 }

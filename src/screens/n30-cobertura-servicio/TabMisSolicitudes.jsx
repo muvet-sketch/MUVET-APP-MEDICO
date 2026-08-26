@@ -7,8 +7,9 @@ import SolicitudForm from './SolicitudForm';
 
 // "Mis Solicitudes": lo que publiqué (con opción de cancelar mientras nadie
 // se ofrezca) y lo que estoy cubriendo de otro médico, mientras el servicio
-// siga activo (abierta/cubierta). Una vez finalizado o cancelado pasa a
-// "Historial".
+// siga activo (abierta/cubierta). Una vez finalizado o cancelado sale de esta
+// pestaña y pasa al historial único de /historial (N-9), donde convive con el
+// historial de Relevo — ver lib/historialUnificado.js.
 export default function TabMisSolicitudes({ perfil }) {
   const navigate = useNavigate();
   const [solicitudes, setSolicitudes] = useState([]);
@@ -56,7 +57,7 @@ export default function TabMisSolicitudes({ perfil }) {
     setProcesandoId(id);
     try {
       await finalizarServicio(id);
-      showToast('Servicio finalizado. El chat quedó cerrado y pasó a Historial.', 'ok');
+      showToast('Servicio finalizado. El chat quedó cerrado y pasó a tu historial.', 'ok');
       cargar();
     } catch (err) {
       showToast(err.message ?? 'No se pudo finalizar.', 'critical');

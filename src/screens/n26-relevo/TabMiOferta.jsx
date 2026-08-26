@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Badge, Input, Button, Toggle, Toast, ChipMultiSelect, ProgressSteps, Modal } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
 import { formatCOP } from '../../lib/format';
@@ -14,7 +15,6 @@ import {
   PASOS_PUBLICACION,
   fetchMensajesRecibidos,
   fetchMisPostulaciones,
-  enviarMensaje,
   marcarPostulacionesLeidas,
   contarRelevosConfirmados,
   normalizarCupos,
@@ -777,36 +777,21 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOf
 
 // Lado del interesado en la decisión única (0020, reemplaza la confirmación
 // doble de 0016): las ofertas de OTROS que validé desde la pestaña "Ofertas"
-// y cuya decisión (del autor) espero o ya conozco. Vive aquí en vez de en una
+// y cuya decisión (del autor) todavía espero. Vive aquí en vez de en una
 // cuarta pestaña para no apretar el header a 390px.
-function MisPostulacionesSeccion({ perfil, postulaciones, loading, showToast }) {
-  const [respondiendo, setRespondiendo] = useState(null);
-  const [respuesta, setRespuesta] = useState('');
-  const [enviando, setEnviando] = useState(false);
-
-  async function handleEnviar(e) {
-    e.preventDefault();
-    if (!respondiendo || !respuesta.trim()) return;
-    setEnviando(true);
-    try {
-      await enviarMensaje({ publicacionId: respondiendo.publicacion_id, remitenteId: perfil.id, mensaje: respuesta.trim() });
-      setRespondiendo(null);
-      setRespuesta('');
-      showToast('Mensaje enviado.', 'ok');
-    } catch {
-      showToast('No se pudo enviar el mensaje.', 'critical');
-    } finally {
-      setEnviando(false);
-    }
-  }
-
+//
+// Solo las PENDIENTES: una vez el autor decide (aceptada/rechazada) la
+// postulación pasa al historial único de /historial, para no duplicar el mismo
+// rastro en dos lugares. Por eso el caso 'rechazada' ya no se contempla acá.
+function MisPostulacionesSeccion({ postulaciones, loading }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[12px] font-semibold text-[#5A6B7A]">Mis postulaciones</p>
       {loading && <p className="text-[12px] text-[#5A6B7A]">Cargando…</p>}
       {!loading && postulaciones.length === 0 && (
         <Card className="text-center text-[12px] text-[#5A6B7A]">
-          Aún no has validado ninguna oferta. Explóralas en la pestaña "Ofertas".
+          No tienes postulaciones esperando respuesta. Explora ofertas en la pestaña "Ofertas"; las ya decididas están en
+          tu historial.
         </Card>
       )}
       {!loading &&
@@ -825,74 +810,25 @@ function MisPostulacionesSeccion({ perfil, postulaciones, loading, showToast }) 
                 Sobre: {m.publicacion?.descripcion || '(sin descripción)'}
                 {m.publicacion?.zona ? ` · ${m.publicacion.zona}` : ''}
               </p>
-              {m.estado === 'pendiente' && (
-                <p className="text-[11px] text-[#5A6B7A]">Esperando la decisión del autor de la oferta.</p>
-              )}
-              {m.estado === 'aceptada' && (
-                <>
-                  <p className="text-[11px] text-[#1A7A5E]">Aceptada — ya pueden escribirse.</p>
-                  <Button
-                    variant="outline"
-                    fullWidth={false}
-                    className="!w-auto self-start px-3 py-2 text-[12px]"
-                    onClick={() => setRespondiendo(m)}
-                  >
-                    Enviar mensaje
-                  </Button>
-                </>
-              )}
+              <p className="text-[11px] text-[#5A6B7A]">Esperando la decisión del autor de la oferta.</p>
             </Card>
           );
         })}
-
-      <Modal open={Boolean(respondiendo)} onClose={() => setRespondiendo(null)} title="Enviar mensaje">
-        <form onSubmit={handleEnviar} className="flex flex-col gap-3">
-          <p className="text-[12px] text-[#5A6B7A]">Mensaje único de contacto — sin chat en tiempo real (D-540).</p>
-          <textarea
-            rows={4}
-            value={respuesta}
-            onChange={(e) => setRespuesta(e.target.value)}
-            placeholder="Escribe tu mensaje…"
-            className="w-full rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2.5 text-[14px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
-          />
-          <Button type="submit" disabled={enviando || !respuesta.trim()}>
-            {enviando ? 'Enviando…' : 'Enviar'}
-          </Button>
-        </form>
-      </Modal>
     </div>
   );
 }
 
-// Ofertas ya cerradas (canceladas o finalizadas) de la pestaña activa —
-// solo lectura, para no perder el rastro de "todos los pasos" una vez la
-// oferta vigente cambió de fila (0018: cancelar/finalizar son terminales).
-function HistorialOfertasSeccion({ historial }) {
-  if (historial.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-[12px] font-semibold text-[#5A6B7A]">Ofertas anteriores en esta pestaña</p>
-      {historial.map((p) => {
-        const badge = ESTADO_PUBLICACION_BADGE[p.estado] ?? { label: p.estado, tone: 'neutral' };
-        return (
-          <Card key={p.id} className="flex flex-col gap-2 opacity-80">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[13px] font-medium text-[#0A1628]">{p.descripcion || '(sin descripción)'}</p>
-              <Badge tone={badge.tone}>{badge.label}</Badge>
-            </div>
-            {p.zona && <p className="text-[11px] text-[#5A6B7A]">{p.zona}</p>}
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
+// La sección "Ofertas anteriores en esta pestaña" se retiró de aquí: las
+// ofertas canceladas o finalizadas (0018: ambas terminales) están ahora en el
+// historial único de /historial (N-9), junto a las postulaciones ya decididas
+// y al historial de Cobertura de Servicio. Ver lib/historialUnificado.js.
 
 export default function TabMiOferta({ perfil }) {
   // El formulario puede escribir las habilidades de catálogo en `perfiles`
   // (médico/auxiliar), así que hay que refrescar el perfil del contexto para
   // que la siguiente oferta arranque con los valores nuevos.
   const { refreshPerfil } = useAuth();
+  const navigate = useNavigate();
   const [misPublicaciones, setMisPublicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -937,7 +873,10 @@ export default function TabMiOferta({ perfil }) {
   async function cargarPostulaciones() {
     setLoadingPostulaciones(true);
     try {
-      setPostulaciones(await fetchMisPostulaciones(perfil.id));
+      const data = await fetchMisPostulaciones(perfil.id);
+      // Las ya decididas (aceptada/rechazada) viven en /historial — acá solo
+      // queda lo que sigue esperando la decisión del autor.
+      setPostulaciones(data.filter((m) => m.estado === 'pendiente'));
     } finally {
       setLoadingPostulaciones(false);
     }
@@ -959,7 +898,7 @@ export default function TabMiOferta({ perfil }) {
   }, [perfil.id]);
 
   const seccionPostulaciones = (
-    <MisPostulacionesSeccion perfil={perfil} postulaciones={postulaciones} loading={loadingPostulaciones} showToast={showToast} />
+    <MisPostulacionesSeccion postulaciones={postulaciones} loading={loadingPostulaciones} />
   );
 
   const activa = tabs.find((t) => t.key === subTab) ?? tabs[0];
@@ -971,7 +910,6 @@ export default function TabMiOferta({ perfil }) {
     ? misPublicaciones.filter((p) => p.tipo === activa.tipo && p.rol_objetivo === activa.rolObjetivo)
     : [];
   const oferta = publicacionesTab.find((p) => !p.estado || p.estado === 'abierta') ?? null;
-  const historialTab = publicacionesTab.filter((p) => p.id !== oferta?.id);
   // Cada pestaña es exclusiva: solo se muestran las solicitudes dirigidas a
   // la publicación de esa pestaña, nunca las de la otra audiencia. Esto es lo
   // que permite tener las dos ofertas del rol activas a la vez, cada una con
@@ -1009,9 +947,15 @@ export default function TabMiOferta({ perfil }) {
         />
       )}
 
-      <HistorialOfertasSeccion historial={historialTab} />
-
       {seccionPostulaciones}
+
+      <button
+        type="button"
+        onClick={() => navigate('/historial')}
+        className="self-start text-[12px] font-medium text-[#1A7A5E]"
+      >
+        Ver historial de ofertas y postulaciones cerradas →
+      </button>
 
       <Toast message={toast.message} tone={toast.tone} visible={toast.visible} />
     </div>

@@ -1,5 +1,9 @@
 // MOCK — datos de ejemplo. No representan información real de la base de datos.
-// Usados en N-2 (Home) mientras el feed de actividad real no está implementado (Fase 4).
+// Alimentan la sección "Actividad reciente" de N-27 (Mis Domicilios · Tab
+// "Activos") mientras el feed de actividad real no está implementado (Fase 4).
+// Vivía en la Home (N-2) hasta que ese espacio pasó a las ofertas de Relevo:
+// es actividad de domicilios, así que se movió a ese módulo. Debajo de estas
+// tarjetas, la misma sección ya lista los servicios cerrados reales.
 
 export const MOCK_ACTIVIDAD_RECIENTE = [
   {
@@ -26,8 +30,13 @@ export const MOCK_ACTIVIDAD_RECIENTE = [
 ];
 
 // MOCK — datos de ejemplo. No representan servicios reales.
-// Usados en N-27 (Mis Domicilios · Tab "Activos") mientras N-3/N-4/N-21 no están
-// construidos (Fase 3). El botón [Ir →]/[Ver →] de estas cards es no-op — TODO Fase 4/6.
+// Usados en N-27 (Mis Domicilios · Tab "Activos", sección "Hoy") mientras
+// N-3/N-4/N-21 no están construidos (Fase 3). El botón [Ir →] de estas cards
+// es no-op — TODO Fase 4/6.
+//
+// MOCK_ACTIVOS_ANTERIORES se eliminó: su sección "Anteriores" fue reemplazada
+// por "Actividad reciente", que ya lista los servicios cerrados reales
+// (fetchServiciosCerrados) junto a MOCK_ACTIVIDAD_RECIENTE.
 export const MOCK_ACTIVOS_HOY = [
   {
     id: 'mock-activo-1',
@@ -36,27 +45,6 @@ export const MOCK_ACTIVOS_HOY = [
     especie: 'Canino',
     tutor: 'Camila Restrepo',
     hora: '3:30 p.m.',
-  },
-];
-
-export const MOCK_ACTIVOS_ANTERIORES = [
-  {
-    id: 'mock-anterior-1',
-    estado: 'completado',
-    mascota: 'Max',
-    especie: 'Canino',
-    tutor: 'Julián Gómez',
-    fecha: '18 jul 2026',
-    hora: '3:30 p.m.',
-  },
-  {
-    id: 'mock-anterior-2',
-    estado: 'completado',
-    mascota: 'Luna',
-    especie: 'Felino',
-    tutor: 'Andrea Beltrán',
-    fecha: '17 jul 2026',
-    hora: '11:10 a.m.',
   },
 ];
 

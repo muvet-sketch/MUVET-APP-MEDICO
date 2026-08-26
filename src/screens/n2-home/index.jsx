@@ -11,7 +11,7 @@ import {
 } from '../../lib/solicitudes';
 import ValidationBadge from './ValidationBadge';
 import QuickAccess from './QuickAccess';
-import ActivityFeed from './ActivityFeed';
+import OfertasRecientes from './OfertasRecientes';
 import { Card, Button, Toast, BottomNav, NotificationBell } from '../../components/ui';
 import N3Solicitudes from '../n3-solicitudes';
 
@@ -141,7 +141,10 @@ export default function N2Home() {
 
       <QuickAccess disponible={perfil.disponible} servicioActivo={servicioActivo} />
 
-      <ActivityFeed />
+      {/* "Actividad reciente" (mock) se movió a N-27 · Mis Domicilios, que es
+          su módulo real. Este espacio lo ocupan ahora las ofertas de Relevo
+          abiertas, que sí son accionables desde la Home. */}
+      <OfertasRecientes perfil={perfil} />
 
       {solicitudPendiente && (
         <N3Solicitudes

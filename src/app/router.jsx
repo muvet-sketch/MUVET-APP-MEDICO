@@ -65,7 +65,12 @@ export default function AppRouter() {
       <Route path="/soap/:servicioId" element={<ProtectedRoute allowedRoles={['medico']}><N15Soap /></ProtectedRoute>} />
       <Route path="/cierre/:servicioId" element={<ProtectedRoute allowedRoles={['medico']}><N19CierreServicio /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute allowedRoles={['medico']}><N8PerfilMedico /></ProtectedRoute>} />
-      <Route path="/historial" element={<ProtectedRoute allowedRoles={['medico']}><N9Historial /></ProtectedRoute>} />
+      {/* /historial: historial único de Cobertura de Servicio + MUVET Relevo.
+          Abierta a los 3 actores, igual que /relevo — un auxiliar o una clínica
+          también acumulan ofertas y postulaciones cerradas. Lo de Cobertura
+          (médico↔médico) simplemente les vuelve vacío. El historial de
+          DOMICILIOS ya no está aquí: vive en /servicios (N-27). */}
+      <Route path="/historial" element={<ProtectedRoute><N9Historial /></ProtectedRoute>} />
       {/* N-5: Expediente del paciente — implementado en Fase 3, renumerado en Fase 4
           (Acción 0, ver CLAUDE.md/D-56X-ENM). Acepta ?modo=lectura (desde N-4) y el id
           literal 'nuevo' (caso paciente sin expediente previo). */}

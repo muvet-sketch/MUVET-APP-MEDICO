@@ -7,20 +7,23 @@
 // ver supabase/migrations/0023_cobertura_servicio.sql) activo solo mientras
 // dura el servicio. Historial de apoyos prestados/solicitados sin el chat.
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ScreenHeader, BottomNav } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
 import TabDisponibles from './TabDisponibles';
 import TabMisSolicitudes from './TabMisSolicitudes';
-import TabHistorial from './TabHistorial';
 
+// La pestaña "Historial" que vivía aquí se retiró: los apoyos finalizados y
+// cancelados están ahora en el historial único de /historial (N-9), junto al
+// historial de Relevo. Ver lib/historialUnificado.js.
 const TABS = [
   { key: 'disponibles', label: 'Disponibles' },
   { key: 'mis-solicitudes', label: 'Mis Solicitudes' },
-  { key: 'historial', label: 'Historial' },
 ];
 
 export default function N30CoberturaServicio() {
   const { perfil } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState('disponibles');
 
   if (!perfil) return null;
@@ -45,9 +48,18 @@ export default function N30CoberturaServicio() {
         ))}
       </div>
 
+      <div className="flex justify-end px-5 pt-3">
+        <button
+          type="button"
+          onClick={() => navigate('/historial')}
+          className="text-[12px] font-medium text-[#1A7A5E]"
+        >
+          Ver historial →
+        </button>
+      </div>
+
       {tab === 'disponibles' && <TabDisponibles perfil={perfil} />}
       {tab === 'mis-solicitudes' && <TabMisSolicitudes perfil={perfil} />}
-      {tab === 'historial' && <TabHistorial perfil={perfil} />}
       <BottomNav />
     </div>
   );

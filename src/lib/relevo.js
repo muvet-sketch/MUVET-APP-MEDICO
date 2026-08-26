@@ -90,6 +90,30 @@ export async function fetchPublicacionesActivas({ tipo, rolObjetivo, paraRol, zo
   return adjuntarAutores(data ?? [], 'autor_id');
 }
 
+// Matching por zona del perfil, compartido entre la pestaña "Ofertas" (N-26)
+// y el bloque "Ofertas recientes" de la Home (N-2) — así la Home nunca muestra
+// una oferta que luego no aparezca en /relevo. `zona_cobertura` es una sola
+// columna de texto con las zonas separadas por coma (ver parseZonas en
+// lib/municipios.js), y `relevo_publicaciones.zona` se serializa igual, así
+// que se compara por substring: basta con que la publicación mencione
+// cualquiera de mis zonas. Sin zona configurada no se filtra nada.
+//
+// SUPUESTO: se hace el split a mano en vez de usar parseZonas() porque este
+// filtro no debe descartar zonas fuera del catálogo — las publicaciones
+// anteriores al catálogo cerrado (0015) tienen `zona` de texto libre y
+// seguirían siendo visibles como hasta ahora.
+export function filtrarPublicacionesPorZona(publicaciones, zonaCobertura) {
+  const zonas = (zonaCobertura ?? '')
+    .split(',')
+    .map((z) => z.trim())
+    .filter(Boolean);
+  if (zonas.length === 0) return publicaciones;
+  return publicaciones.filter((p) => {
+    const zonaPublicacion = (p.zona ?? '').toLowerCase();
+    return zonas.some((z) => zonaPublicacion.includes(z.toLowerCase()));
+  });
+}
+
 export async function fetchMisPublicaciones(autorId) {
   const { data, error } = await supabase
     .from('relevo_publicaciones')
