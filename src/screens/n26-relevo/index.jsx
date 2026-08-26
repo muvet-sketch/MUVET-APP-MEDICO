@@ -1,24 +1,31 @@
-// N-26 · MUVET Relevo (Fase 7). "Ofertas" (explorar y aceptar de otros +
-// solicitudes recibidas sobre mis propias ofertas) / "Mi Oferta" (publicar,
-// activar/desactivar, editar, mis postulaciones) / "Mensajes" entre médico,
-// auxiliar y clínica. D-540: mensaje único de contacto, sin
-// chat en tiempo real. D-545 (revisado, ver PUBLICACIONES_PERMITIDAS_POR_ROL
-// en lib/relevo.js): médico ofrece a clínicas o solicita apoyo a un
-// auxiliar; auxiliar ofrece a clínicas y a médicos; clínica busca médico o
-// auxiliar. Esquema y RLS desde 0001, estado de aceptación de solicitudes
-// agregado en 0011.
+// N-26 · MUVET Turnos. "Ofertas" (explorar y contactar las de otros) / "Mi
+// Oferta" (publicar, activar/desactivar, editar) / "Conversaciones" (los dos
+// lados de cada negociación) entre médico, auxiliar y clínica.
+//
+// OJO: la ruta sigue siendo /relevo y el identificador interno `relevo` — solo
+// cambió el nombre de cara al usuario. Ver el bloque de lib/nombresModulos.js.
+//
+// D-540 modificado en 0027: hay hilo 1:1 privado mientras dura la negociación,
+// y el turno se cierra con el acuerdo de AMBAS partes. D-545 (revisado, ver
+// PUBLICACIONES_PERMITIDAS_POR_ROL en lib/relevo.js): médico ofrece a clínicas
+// o solicita apoyo a un auxiliar; auxiliar ofrece a clínicas y a médicos;
+// clínica busca médico o auxiliar.
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ScreenHeader, BottomNav } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
+import { NOMBRE_TURNOS } from '../../lib/nombresModulos';
 import TabMiOferta from './TabMiOferta';
 import TabOfertas from './TabOfertas';
-import TabMensajes from './TabMensajes';
+import TabConversaciones from './TabConversaciones';
 
+// La clave de la tercera pestaña sigue siendo 'mensajes' aunque la etiqueta
+// cambie: hay notificaciones anteriores a 0027 con `/relevo?tab=mensajes`
+// guardado en su `url`, y deben seguir aterrizando acá.
 const TABS = [
   { key: 'ofertas', label: 'Ofertas' },
   { key: 'mi-oferta', label: 'Mi Oferta' },
-  { key: 'mensajes', label: 'Mensajes' },
+  { key: 'mensajes', label: 'Conversaciones' },
 ];
 
 export default function N26Relevo() {
@@ -30,7 +37,7 @@ export default function N26Relevo() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title="MUVET Relevo" fallbackTo={perfil.rol === 'medico' ? '/home' : '/home-simplificado'} />
+      <ScreenHeader title={NOMBRE_TURNOS} fallbackTo={perfil.rol === 'medico' ? '/home' : '/home-simplificado'} />
 
       <div className="sticky top-[57px] z-10 flex border-b border-[#E1E8ED] bg-white px-5">
         {TABS.map((t) => (
@@ -52,7 +59,7 @@ export default function N26Relevo() {
         <TabOfertas perfil={perfil} rolInicial={searchParams.get('rol') || ''} />
       )}
       {tab === 'mi-oferta' && <TabMiOferta perfil={perfil} />}
-      {tab === 'mensajes' && <TabMensajes perfil={perfil} />}
+      {tab === 'mensajes' && <TabConversaciones perfil={perfil} />}
       <BottomNav />
     </div>
   );

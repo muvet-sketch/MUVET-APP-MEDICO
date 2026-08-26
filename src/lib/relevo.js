@@ -1,13 +1,24 @@
 import { supabase } from './supabase';
 
-// N-26 · MUVET Relevo (D-540/D-545/D-546). Esquema (relevo_publicaciones,
-// relevo_mensajes) y RLS ya existían desde 0001_schema_inicial.sql — esta es
-// solo la capa de acceso a datos, siguiendo el patrón de lib/solicitudes.js.
-// El filtrado de qué publicación ve cada actor es responsabilidad de la capa
-// de acceso a datos y de las pantallas (RLS solo exige `activa = true` y
-// `autor_id = auth.uid()` para escritura — cualquier autenticado puede leer
-// todas las filas), así que `rol_objetivo` debe fijarse siempre en creación
-// y respetarse siempre en las consultas.
+// N-26 · MUVET Turnos (D-540/D-545/D-546). Capa de acceso a datos, siguiendo
+// el patrón de lib/solicitudes.js y lib/coberturaServicio.js.
+//
+// OJO con los nombres: este archivo, la ruta /relevo y las tablas `relevo_*`
+// son el identificador interno de lo que la UI llama "MUVET Turnos"; "MUVET
+// Relevo" es ahora el módulo médico↔médico de lib/coberturaServicio.js. Ver el
+// bloque de lib/nombresModulos.js antes de tocar nada de esto.
+//
+// Desde la migración 0027 la negociación vive en `relevo_conversaciones` (una
+// por par oferta↔interesado, con las dos banderas de acuerdo) y los mensajes
+// en `relevo_mensajes.conversacion_id`. D-540 quedó modificado: hay hilo 1:1
+// privado mientras dura la negociación, y el turno se cierra solo cuando
+// AMBAS partes marcan su acuerdo — `estado` lo deriva un trigger, nunca el
+// cliente.
+//
+// El filtrado de qué publicación ve cada actor sigue siendo responsabilidad de
+// esta capa y de las pantallas, pero ya no es la única defensa: 0027 exige en
+// RLS que una conversación solo se abra sobre una oferta activa, abierta,
+// ajena y dirigida al rol de quien contacta.
 
 // D-545 (revisado): matriz de qué puede publicar cada rol y hacia quién.
 // `rol_objetivo` es siempre "quién debe ver/responder esta publicación" —
@@ -221,24 +232,22 @@ export async function finalizarPublicacion(id, autorId) {
 // Pasos del ciclo de vida de una publicación, para la barra de progreso de
 // "Mi Oferta". Devuelve el índice sobre PASOS_PUBLICACION, o null cuando la
 // publicación está cancelada (no tiene un "avance" que mostrar como barra).
-// Sin la confirmación doble de 0016 (ver 0020) el paso intermedio
-// "Confirmando" ya no existe: la decisión del autor es única e inmediata.
-export const PASOS_PUBLICACION = ['Publicada', 'Postulantes', 'Confirmado', 'Finalizada'];
+// Con el modelo de 0027 el paso "Interesados" es simplemente "hay al menos una
+// conversación viva": ya no hace falta distinguir postulación de pregunta
+// previa, porque contactar no compromete a nada.
+export const PASOS_PUBLICACION = ['Publicada', 'Interesados', 'Confirmado', 'Finalizada'];
 
-export function calcularPasoPublicacion(oferta, mensajes) {
+export function calcularPasoPublicacion(oferta, conversaciones) {
   if (!oferta || oferta.estado === 'cancelada') return null;
   if (oferta.estado === 'finalizada') return 3;
 
-  // Una pregunta previa (0019, es_postulacion=false) no es un postulante: no
-  // debe adelantar la barra de "Publicada" a "Postulantes" solo porque
-  // alguien preguntó algo antes de decidir.
-  const postulaciones = (mensajes ?? []).filter((m) => m.es_postulacion !== false);
-
   const cupos = normalizarCupos(oferta.cupos);
-  const confirmados = contarRelevosConfirmados(postulaciones);
+  const confirmados = contarRelevosConfirmados(conversaciones);
   if (confirmados >= cupos) return 2;
 
-  if (postulaciones.length > 0) return 1;
+  // Una conversación descartada no cuenta como interés vivo.
+  const vivas = (conversaciones ?? []).filter((c) => c.estado !== 'descartada');
+  if (vivas.length > 0) return 1;
 
   return 0;
 }
@@ -260,7 +269,7 @@ export async function activarPublicacion(id, autorId, habilidadesPerfil = null) 
     throw new Error('Esta oferta ya está cerrada (cancelada o finalizada). Crea una publicación nueva.');
   }
   if (confirmados >= cupos) {
-    throw new Error('El relevo ya está confirmado y los cupos están llenos. Crea una publicación nueva.');
+    throw new Error('El turno ya está confirmado y los cupos están llenos. Crea una publicación nueva.');
   }
 
   const payload = { activa: true };
@@ -342,10 +351,9 @@ export async function actualizarPublicacion(
   return data;
 }
 
-// Cupos (0016): cuántos relevos admite la publicación y cuántos ya quedaron
-// confirmados por ambas partes. Se cuenta por postulante distinto para que dos
-// mensajes de la misma persona no consuman dos cupos (mismo criterio que el
-// trigger que cierra la publicación).
+// Cupos (0016): cuántos relevos admite la publicación. Ya no hace falta
+// deduplicar por persona — el UNIQUE(publicacion_id, interesado_id) de 0027
+// garantiza una conversación por interesado, así que basta con contarlas.
 export function normalizarCupos(cupos) {
   const n = Number(cupos);
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
@@ -404,222 +412,194 @@ export function formatFranjaHoraria(publicacion) {
   return `${inicio}${fin ? `–${fin}` : ''}${duracion ? ` (${duracion})` : ''}`;
 }
 
-export function contarRelevosConfirmados(mensajes) {
-  const remitentes = (mensajes ?? [])
-    .filter((m) => m.es_postulacion !== false && m.estado === 'aceptada')
-    .map((m) => m.remitente_id);
-  return new Set(remitentes).size;
+export function contarRelevosConfirmados(conversaciones) {
+  return (conversaciones ?? []).filter((c) => c.estado === 'aceptada').length;
 }
 
 export async function fetchCuposPublicacion(publicacionId) {
-  const [{ data: publicacion, error: errorPublicacion }, { data: mensajes, error: errorMensajes }] = await Promise.all([
-    supabase.from('relevo_publicaciones').select('cupos, estado').eq('id', publicacionId).maybeSingle(),
-    supabase
-      .from('relevo_mensajes')
-      .select('remitente_id, estado, es_postulacion')
-      .eq('publicacion_id', publicacionId),
-  ]);
+  const [{ data: publicacion, error: errorPublicacion }, { data: conversaciones, error: errorConversaciones }] =
+    await Promise.all([
+      supabase.from('relevo_publicaciones').select('cupos, estado').eq('id', publicacionId).maybeSingle(),
+      supabase.from('relevo_conversaciones').select('id, estado').eq('publicacion_id', publicacionId),
+    ]);
   if (errorPublicacion) throw errorPublicacion;
-  if (errorMensajes) throw errorMensajes;
+  if (errorConversaciones) throw errorConversaciones;
 
   return {
     cupos: normalizarCupos(publicacion?.cupos),
     estado: publicacion?.estado ?? null,
-    confirmados: contarRelevosConfirmados(mensajes),
+    confirmados: contarRelevosConfirmados(conversaciones),
   };
 }
 
-// D-540: mensaje único de contacto, sin hilo de chat. `esPostulacion` (0019)
-// distingue "acepto la oferta" (default, como hasta ahora) de "solo quiero
-// preguntar algo antes de decidir" — esto último no crea una postulación: no
-// aparece en fetchMisPostulaciones ni puede confirmarse como relevo (el
-// trigger de la migración lo rechaza si igual se intenta).
-export async function enviarMensaje({ publicacionId, remitenteId, mensaje, esPostulacion = true }) {
+// ============================================================================
+// Conversaciones (0027) — la negociación y su hilo
+// ============================================================================
+
+export function esParteAutora(conversacion, perfilId) {
+  return conversacion?.autor_id === perfilId;
+}
+
+// "Contactar": abre la negociación y deja el primer mensaje. No compromete a
+// nada; el compromiso es el acuerdo mutuo del final.
+//
+// Idempotente contra el UNIQUE(publicacion_id, interesado_id) de 0027: si ya
+// existe la conversación se reutiliza en vez de fallar, porque se puede llegar
+// acá desde dos pestañas o desde una tarjeta con estado desactualizado.
+export async function iniciarConversacion({ publicacionId, interesadoId, mensaje }) {
+  const texto = (mensaje ?? '').trim();
+  if (!texto) throw new Error('Escribe un mensaje para iniciar la conversación.');
+
+  const { data: creada, error } = await supabase
+    .from('relevo_conversaciones')
+    .insert({ publicacion_id: publicacionId, interesado_id: interesadoId })
+    .select()
+    .single();
+
+  let conversacion = creada;
+  if (error) {
+    // 23505 = unique_violation: ya había conversación con esta oferta.
+    if (error.code !== '23505') throw error;
+    const { data: existente, error: errorExistente } = await supabase
+      .from('relevo_conversaciones')
+      .select('*')
+      .eq('publicacion_id', publicacionId)
+      .eq('interesado_id', interesadoId)
+      .single();
+    if (errorExistente) throw errorExistente;
+    conversacion = existente;
+  }
+
+  await enviarMensajeConversacion({ conversacionId: conversacion.id, remitenteId: interesadoId, mensaje: texto });
+  return conversacion;
+}
+
+// La bandeja: mis conversaciones de los DOS lados (las que abrí sobre ofertas
+// ajenas y las que recibí sobre las mías) en una sola consulta. `.or(...)`
+// sobre dos columnas simples, mismo patrón que fetchHistorial en
+// lib/coberturaServicio.js.
+export async function fetchMisConversaciones(perfilId) {
+  const { data, error } = await supabase
+    .from('relevo_conversaciones')
+    .select('*, publicacion:publicacion_id(id, tipo, rol_objetivo, descripcion, zona, autor_id, activa, estado, cupos)')
+    .or(`autor_id.eq.${perfilId},interesado_id.eq.${perfilId}`)
+    .order('ultimo_mensaje_at', { ascending: false });
+  if (error) throw error;
+
+  // Quién es "el otro" depende del lado en el que yo esté en cada fila.
+  const filas = (data ?? []).map((c) => ({
+    ...c,
+    _otroId: c.autor_id === perfilId ? c.interesado_id : c.autor_id,
+  }));
+  const conOtro = await adjuntarAutores(filas, '_otroId', 'otro');
+  return conOtro.map(({ _otroId, ...c }) => c);
+}
+
+export async function fetchConversacion(conversacionId, perfilId) {
+  const { data, error } = await supabase
+    .from('relevo_conversaciones')
+    .select(
+      '*, publicacion:publicacion_id(id, tipo, rol_objetivo, descripcion, zona, tipo_jornada, hora_inicio, hora_fin, duracion_horas, tarifa, turnos, procedimientos, autor_id, activa, estado, cupos)',
+    )
+    .eq('id', conversacionId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const otroId = data.autor_id === perfilId ? data.interesado_id : data.autor_id;
+  const [conOtro] = await adjuntarAutores([{ ...data, _otroId: otroId }], '_otroId', 'otro');
+  const { _otroId, ...conversacion } = conOtro;
+  return conversacion;
+}
+
+export async function fetchMensajesConversacion(conversacionId) {
   const { data, error } = await supabase
     .from('relevo_mensajes')
-    .insert({ publicacion_id: publicacionId, remitente_id: remitenteId, mensaje, es_postulacion: esPostulacion })
+    .select('id, conversacion_id, remitente_id, mensaje, created_at')
+    .eq('conversacion_id', conversacionId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// La policy de insert de 0027 exige que la conversación siga 'abierta': al
+// aceptarse o descartarse el hilo deja de admitir mensajes en backend, no solo
+// porque la UI esconda el composer.
+export async function enviarMensajeConversacion({ conversacionId, remitenteId, mensaje }) {
+  const texto = (mensaje ?? '').trim();
+  if (!texto) throw new Error('El mensaje no puede estar vacío.');
+
+  const { data, error } = await supabase
+    .from('relevo_mensajes')
+    .insert({ conversacion_id: conversacionId, remitente_id: remitenteId, mensaje: texto })
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-// Confirmación única del relevo (0020, reemplaza la doble confirmación de
-// 0016): "Validar Oferta" ya es el compromiso del interesado, así que la
-// única decisión que falta es la del autor de la publicación — aceptar o
-// rechazar, desde "Solicitudes activas". El trigger de 0020 hace la decisión
-// terminal (no se puede revertir) y valida en backend que quien la toma sea
-// realmente el autor, por si la policy de update del remitente (0016) se
-// intentara usar para escribirse la propia aceptación.
-export async function decidirPostulacion(mensajeId, decision) {
-  if (decision !== 'aceptada' && decision !== 'rechazada') {
-    throw new Error('Decisión inválida.');
-  }
-  const { error } = await supabase.from('relevo_mensajes').update({ estado: decision }).eq('id', mensajeId);
-  if (error) throw error;
-}
-
-// Las ofertas de OTROS a las que yo me postulé, para poder confirmarlas desde
-// mi lado. Excluye las publicaciones propias: ahí mis filas son respuestas
-// que envié como dueño, no postulaciones (ver `enviarMensaje` en Mi Oferta).
-// También excluye las preguntas previas (0019, es_postulacion=false): esas no
-// son una postulación real, así que no deben marcar "ya te postulaste" ni
-// aparecer en "Mis postulaciones" a la espera de una confirmación que nunca
-// vendrá.
-export async function fetchMisPostulaciones(remitenteId) {
+// "Estoy de acuerdo". Cada lado solo puede mover su propia bandera y `estado`
+// lo deriva el trigger de 0027 — acá nunca se escribe. El relevo queda cerrado
+// cuando las dos banderas están en true.
+export async function acordarConversacion(conversacion, perfilId) {
+  const campo = esParteAutora(conversacion, perfilId) ? 'acuerdo_autor' : 'acuerdo_interesado';
   const { data, error } = await supabase
-    .from('relevo_mensajes')
-    .select('*, publicacion:publicacion_id!inner(id, tipo, rol_objetivo, descripcion, zona, autor_id, activa, cupos)')
-    .eq('remitente_id', remitenteId)
-    .eq('es_postulacion', true)
-    .order('created_at', { ascending: false });
+    .from('relevo_conversaciones')
+    .update({ [campo]: true })
+    .eq('id', conversacion.id)
+    .select()
+    .single();
   if (error) throw error;
-
-  const ajenas = (data ?? []).filter((m) => m.publicacion?.autor_id !== remitenteId);
-  const conAutor = await adjuntarAutores(
-    ajenas.map((m) => ({ ...m, _autorPublicacionId: m.publicacion.autor_id })),
-    '_autorPublicacionId',
-    'autorPublicacion',
-  );
-  return conAutor.map(({ _autorPublicacionId, ...m }) => m);
+  return data;
 }
 
-// SUPUESTO: el teléfono del remitente (D-540, contacto tras aceptar) ya no
-// se pide aquí — `perfiles_publico` (0014) deliberadamente no expone
-// teléfono a cualquier autenticado. Falta una función security definer que
-// lo revele solo al dueño de la publicación; queda pendiente como mejora
-// futura, fuera de alcance de este fix (ver 0014).
-export async function fetchMensajesRecibidos(autorId) {
+// Terminal, y la puede tomar cualquiera de los dos. No consume cupo.
+export async function descartarConversacion(conversacionId) {
   const { data, error } = await supabase
-    .from('relevo_mensajes')
-    .select('*, publicacion:publicacion_id!inner(id, tipo, descripcion, autor_id, activa, cupos)')
-    .eq('publicacion.autor_id', autorId)
-    .order('created_at', { ascending: false });
+    .from('relevo_conversaciones')
+    .update({ estado: 'descartada' })
+    .eq('id', conversacionId)
+    .select()
+    .single();
   if (error) throw error;
-  return adjuntarAutores(data ?? [], 'remitente_id', 'remitente');
+  return data;
 }
 
-// Ficha de contacto ampliada (0022): NIT/dirección/teléfono de la clínica, o
-// matrícula COMVEZCOL/estado de validación/especialidad/zona/bio/teléfono del
-// médico o auxiliar — lo que `perfiles_publico` (0014) deliberadamente no
-// expone a cualquier autenticado. `relevo_ficha_contacto` (security definer)
-// solo la devuelve si `perfilId` y quien pregunta ya intercambiaron un
-// mensaje de Relevo; si no hay relación, devuelve null y la UI cae de vuelta
-// a los datos básicos (nombre, rol) que ya trae `remitente`/`autorPublicacion`.
+// Marca de lectura por lado. Es la que apaga el punto rojo de la bandeja de
+// conversaciones; el badge de la campana sigue saliendo de `notificaciones`
+// (0026, lib/notificaciones.js), que es una cosa distinta.
+export async function marcarConversacionLeida(conversacion, perfilId) {
+  const campo = esParteAutora(conversacion, perfilId) ? 'leido_autor_at' : 'leido_interesado_at';
+  const { error } = await supabase
+    .from('relevo_conversaciones')
+    .update({ [campo]: new Date().toISOString() })
+    .eq('id', conversacion.id);
+  if (error) throw error;
+}
+
+// Punto rojo de la bandeja: hay actividad posterior a mi última visita. Se
+// compara contra `ultimo_mensaje_at` en vez de contar filas para no tener que
+// traer los mensajes de todas las conversaciones solo para pintar la lista.
+export function tieneNoLeidos(conversacion, perfilId) {
+  if (!conversacion) return false;
+  const visto = esParteAutora(conversacion, perfilId)
+    ? conversacion.leido_autor_at
+    : conversacion.leido_interesado_at;
+  if (!visto) return true;
+  return new Date(conversacion.ultimo_mensaje_at) > new Date(visto);
+}
+
+// Ficha de contacto ampliada (0022, reescrita en 0027): matrícula COMVEZCOL y
+// su estado de validación, especialidad, zona, bio y NIT en cuanto hay una
+// conversación — lo que hace falta para saber con quién estás hablando y que
+// `perfiles_publico` (0014) deliberadamente no expone a cualquier autenticado.
+// `telefono` y `direccion_sede` llegan en null hasta que la conversación queda
+// 'aceptada': el dato de contacto directo se revela después del compromiso,
+// mismo criterio que D-064. Si no hay ninguna relación, devuelve null y la UI
+// cae de vuelta a los datos básicos (nombre, rol) que ya trae `otro`.
 export async function fetchFichaContacto(perfilId) {
   if (!perfilId) return null;
   const { data, error } = await supabase.rpc('relevo_ficha_contacto', { p_perfil_id: perfilId });
   if (error) throw error;
   return data?.[0] ?? null;
-}
-
-// Campana de notificaciones (N-26 · Mensajes). Cuenta mensajes recibidos que
-// el dueño de la publicación todavía no vio (0013: columna `leido`).
-// Nota: se trae el arreglo de ids y se cuenta en cliente (en vez de
-// count:'exact'+head:true) porque esa combinación con filtro sobre columna de
-// tabla anidada (publicacion.autor_id) resultó inestable en PostgREST
-// (probado contra el proyecto real: mismo query devolvía 200 y 400 según el
-// momento) — mismo patrón ya probado que usa fetchMensajesRecibidos.
-export async function fetchMensajesNoLeidosCount(autorId) {
-  const { data, error } = await supabase
-    .from('relevo_mensajes')
-    .select('id, publicacion:publicacion_id!inner(autor_id)')
-    .eq('leido', false)
-    .eq('publicacion.autor_id', autorId);
-  if (error) throw error;
-  return data?.length ?? 0;
-}
-
-// Se llama al abrir la pestaña "Mensajes" — marca todo lo recibido como
-// visto. D-540: sigue siendo un mensaje único por fila, no un hilo.
-export async function marcarMensajesLeidos(autorId) {
-  const { data: propias, error: errorPublicaciones } = await supabase
-    .from('relevo_publicaciones')
-    .select('id')
-    .eq('autor_id', autorId);
-  if (errorPublicaciones) throw errorPublicaciones;
-
-  const ids = (propias ?? []).map((p) => p.id);
-  if (ids.length === 0) return;
-
-  const { error } = await supabase
-    .from('relevo_mensajes')
-    .update({ leido: true })
-    .in('publicacion_id', ids)
-    .eq('leido', false);
-  if (error) throw error;
-}
-
-// Realtime para la campana: escucha nuevos mensajes en toda la tabla (no se
-// puede filtrar por publicacion.autor_id en postgres_changes) y descarta los
-// que no son sobre una publicación propia, igual que
-// subscribeNuevasSolicitudesPendientes en lib/solicitudes.js.
-export function subscribeNuevosMensajesRelevo(autorId, onNuevoMensaje) {
-  const channel = supabase
-    .channel(`relevo-mensajes-${autorId}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'relevo_mensajes' },
-      async (payload) => {
-        const { data } = await supabase
-          .from('relevo_publicaciones')
-          .select('id')
-          .eq('id', payload.new.publicacion_id)
-          .eq('autor_id', autorId)
-          .maybeSingle();
-        if (data) onNuevoMensaje(payload.new);
-      },
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}
-
-// Campana de notificaciones, lado del interesado (0020): cuenta postulaciones
-// mías que el autor ya decidió (aceptada/rechazada) y que todavía no vi.
-// `decision_leida` es una columna directa sobre mi propia fila (soy
-// `remitente_id`), así que a diferencia de fetchMensajesNoLeidosCount no hace
-// falta filtrar sobre una tabla anidada.
-export async function fetchPostulacionesNoLeidasCount(remitenteId) {
-  const { data, error } = await supabase
-    .from('relevo_mensajes')
-    .select('id')
-    .eq('remitente_id', remitenteId)
-    .eq('decision_leida', false);
-  if (error) throw error;
-  return data?.length ?? 0;
-}
-
-// Se llama al abrir "Mi Oferta" (donde vive "Mis postulaciones") — marca como
-// vistas todas las decisiones pendientes de notificar.
-export async function marcarPostulacionesLeidas(remitenteId) {
-  const { error } = await supabase
-    .from('relevo_mensajes')
-    .update({ decision_leida: true })
-    .eq('remitente_id', remitenteId)
-    .eq('decision_leida', false);
-  if (error) throw error;
-}
-
-// Realtime para la campana del interesado: a diferencia de
-// subscribeNuevosMensajesRelevo (INSERT sobre publicaciones propias), acá se
-// puede filtrar directo por `remitente_id` en el propio postgres_changes
-// porque es una columna simple de la fila, no una tabla anidada.
-export function subscribeDecisionesRelevo(remitenteId, onDecision) {
-  const channel = supabase
-    .channel(`relevo-decisiones-${remitenteId}`)
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'relevo_mensajes', filter: `remitente_id=eq.${remitenteId}` },
-      (payload) => {
-        if (payload.new.decision_leida === false) onDecision(payload.new);
-      },
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
 }

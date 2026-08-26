@@ -13,9 +13,7 @@ import {
   finalizarPublicacion,
   calcularPasoPublicacion,
   PASOS_PUBLICACION,
-  fetchMensajesRecibidos,
-  fetchMisPostulaciones,
-  marcarPostulacionesLeidas,
+  fetchMisConversaciones,
   contarRelevosConfirmados,
   normalizarCupos,
   PUBLICACIONES_PERMITIDAS_POR_ROL,
@@ -53,8 +51,6 @@ const PROCEDIMIENTOS_AUXILIAR = [
   'Asistencia en rayos X',
   'Toma de muestras',
 ];
-const ACTOR_LABEL = { clinica: '🏥 Clínica', auxiliar: '🧰 Auxiliar', medico: '🩺 Médico' };
-
 // Etiquetas de cada combinación (tipo, rol_objetivo) permitida por rol —
 // ver PUBLICACIONES_PERMITIDAS_POR_ROL en lib/relevo.js (D-545 revisado).
 const OPCION_LABEL_POR_ROL = {
@@ -72,14 +68,6 @@ const OPCION_LABEL_POR_ROL = {
   },
 };
 const TURNOS_OPCIONES = ['Turno día', 'Turno noche', 'Hospitalización', 'Consulta'];
-// Estado de la decisión única (0020, reemplaza la confirmación doble de
-// 0016): la escribe directamente el autor de la publicación al aceptar o
-// rechazar, así que basta con leerla.
-const ESTADO_BADGE = {
-  pendiente: { label: 'Pendiente de respuesta', tone: 'alert' },
-  aceptada: { label: 'Aceptada', tone: 'ok' },
-  rechazada: { label: 'Rechazada', tone: 'critical' },
-};
 
 // Estado de la propia publicación (0018: cancelación/finalización, distinto
 // de `activa`, que es solo el toggle de "publicada / no publicada").
@@ -561,12 +549,11 @@ function HabilidadesOferta({ oferta, esperadas }) {
 }
 
 // Sección completa de "una oferta": formulario/tarjeta + conteo de cupos
-// (`solicitudes` solo se usa para ese conteo — el listado de solicitudes en
-// sí se muestra en la pestaña "Ofertas", debajo del listado de ofertas de
-// otros). La usan tanto el auxiliar (una instancia por pestaña, con
-// `comboFiltro` fijo) como médico/clínica (una sola instancia, sin
-// `comboFiltro`, igual que antes).
-function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOfertaChange, onPerfilChange, showToast }) {
+// (`conversaciones` solo se usa para ese conteo y para la barra de progreso —
+// las conversaciones en sí se gestionan en la pestaña "Conversaciones"). La
+// usan tanto el auxiliar (una instancia por pestaña, con `comboFiltro` fijo)
+// como médico/clínica (una sola instancia, sin `comboFiltro`).
+function OfertaSeccion({ perfil, comboFiltro, oferta, loading, conversaciones, onOfertaChange, onPerfilChange, showToast }) {
   const [editando, setEditando] = useState(false);
   const [toggling, setToggling] = useState(false);
   // 'cancelar' | 'finalizar' | null — qué confirmación está abierta (0018:
@@ -576,10 +563,10 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOf
   const [procesando, setProcesando] = useState(false);
 
   const cuposOferta = normalizarCupos(oferta?.cupos);
-  const confirmados = contarRelevosConfirmados(solicitudes);
+  const confirmados = contarRelevosConfirmados(conversaciones);
   const cuposLlenos = Boolean(oferta) && confirmados >= cuposOferta;
   const terminal = Boolean(oferta) && oferta.estado && oferta.estado !== 'abierta';
-  const paso = calcularPasoPublicacion(oferta, solicitudes);
+  const paso = calcularPasoPublicacion(oferta, conversaciones);
   const estadoBadge = terminal
     ? ESTADO_PUBLICACION_BADGE[oferta.estado]
     : { label: oferta?.activa ? 'Publicada' : 'No publicada', tone: oferta?.activa ? 'ok' : 'neutral' };
@@ -707,7 +694,7 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOf
                 />
               </div>
               <p className="text-[11px] text-[#5A6B7A]">
-                {confirmados} de {cuposOferta} relevo(s) confirmado(s)
+                {confirmados} de {cuposOferta} turno(s) confirmado(s)
                 {cuposLlenos ? ' · cupos llenos, la oferta dejó de ser pública.' : ''}
               </p>
             </div>
@@ -739,7 +726,7 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOf
           )}
           {!terminal && confirmados < 1 && (
             <p className="text-[11px] text-[#5A6B7A]">
-              "Dar por finalizada" se habilita cuando al menos un relevo quede confirmado.
+              "Dar por finalizada" se habilita cuando al menos un turno quede confirmado.
             </p>
           )}
         </Card>
@@ -753,7 +740,7 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOf
         <div className="flex flex-col gap-3">
           <p className="text-[13px] text-[#0A1628]">
             {confirmando === 'cancelar'
-              ? 'Esta acción es permanente: la oferta dejará de ser pública y las postulaciones sin confirmar quedarán rechazadas. No podrás reactivarla — tendrás que publicar una nueva.'
+              ? 'Esta acción es permanente: la oferta dejará de ser pública y las conversaciones todavía abiertas quedarán descartadas. Los relevos ya confirmados no se tocan. No podrás reactivarla — tendrás que publicar una nueva.'
               : 'Confirma que la labor ya se cumplió. Esta acción es permanente y la oferta dejará de ser pública.'}
           </p>
           <div className="flex gap-2">
@@ -775,53 +762,16 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, solicitudes, onOf
   );
 }
 
-// Lado del interesado en la decisión única (0020, reemplaza la confirmación
-// doble de 0016): las ofertas de OTROS que validé desde la pestaña "Ofertas"
-// y cuya decisión (del autor) todavía espero. Vive aquí en vez de en una
-// cuarta pestaña para no apretar el header a 390px.
+// "Mis postulaciones" se retiró de aquí (0027): las ofertas de otros que
+// contacté ya no son un listado aparte esperando la decisión ajena — son
+// conversaciones, y viven junto a las que recibí en la pestaña
+// "Conversaciones". Antes esta sección solo podía decir "Esperando la decisión
+// del autor", porque el modelo plano no dejaba ver la respuesta del otro lado.
 //
-// Solo las PENDIENTES: una vez el autor decide (aceptada/rechazada) la
-// postulación pasa al historial único de /historial, para no duplicar el mismo
-// rastro en dos lugares. Por eso el caso 'rechazada' ya no se contempla acá.
-function MisPostulacionesSeccion({ postulaciones, loading }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-[12px] font-semibold text-[#5A6B7A]">Mis postulaciones</p>
-      {loading && <p className="text-[12px] text-[#5A6B7A]">Cargando…</p>}
-      {!loading && postulaciones.length === 0 && (
-        <Card className="text-center text-[12px] text-[#5A6B7A]">
-          No tienes postulaciones esperando respuesta. Explora ofertas en la pestaña "Ofertas"; las ya decididas están en
-          tu historial.
-        </Card>
-      )}
-      {!loading &&
-        postulaciones.map((m) => {
-          const autor = m.autorPublicacion;
-          const nombreAutor = autor?.razon_social || autor?.nombre_completo || 'Usuario MUVET';
-          const estado = ESTADO_BADGE[m.estado] ?? ESTADO_BADGE.pendiente;
-          return (
-            <Card key={m.id} className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[13px] font-semibold text-[#0A1628]">{nombreAutor}</p>
-                <Badge tone={estado.tone}>{estado.label}</Badge>
-              </div>
-              <p className="text-[11px] text-[#5A6B7A]">{ACTOR_LABEL[autor?.rol] ?? ''}</p>
-              <p className="text-[12px] text-[#5A6B7A]">
-                Sobre: {m.publicacion?.descripcion || '(sin descripción)'}
-                {m.publicacion?.zona ? ` · ${m.publicacion.zona}` : ''}
-              </p>
-              <p className="text-[11px] text-[#5A6B7A]">Esperando la decisión del autor de la oferta.</p>
-            </Card>
-          );
-        })}
-    </div>
-  );
-}
-
-// La sección "Ofertas anteriores en esta pestaña" se retiró de aquí: las
-// ofertas canceladas o finalizadas (0018: ambas terminales) están ahora en el
-// historial único de /historial (N-9), junto a las postulaciones ya decididas
-// y al historial de Cobertura de Servicio. Ver lib/historialUnificado.js.
+// La sección "Ofertas anteriores en esta pestaña" también se retiró: las
+// ofertas canceladas o finalizadas (0018: ambas terminales) están en el
+// historial único de /historial (N-9), junto a las conversaciones cerradas y
+// al historial de Cobertura de Servicio. Ver lib/historialUnificado.js.
 
 export default function TabMiOferta({ perfil }) {
   // El formulario puede escribir las habilidades de catálogo en `perfiles`
@@ -832,11 +782,9 @@ export default function TabMiOferta({ perfil }) {
   const [misPublicaciones, setMisPublicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [solicitudes, setSolicitudes] = useState([]);
-  const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
-
-  const [postulaciones, setPostulaciones] = useState([]);
-  const [loadingPostulaciones, setLoadingPostulaciones] = useState(true);
+  // Solo para el conteo de cupos y la barra de progreso: las conversaciones se
+  // gestionan en su propia pestaña.
+  const [conversaciones, setConversaciones] = useState([]);
 
   const tabs = TABS_POR_ROL[perfil.rol] ?? [];
   const [subTab, setSubTab] = useState(tabs[0]?.key);
@@ -856,50 +804,27 @@ export default function TabMiOferta({ perfil }) {
     } finally {
       setLoading(false);
     }
+    // Cancelar una oferta descarta sus conversaciones abiertas (trigger de
+    // 0027), así que el conteo de cupos hay que releerlo junto con la oferta.
+    await cargarConversaciones();
   }
 
-  async function cargarSolicitudes() {
-    setLoadingSolicitudes(true);
+  async function cargarConversaciones() {
     try {
-      const data = await fetchMensajesRecibidos(perfil.id);
-      // Excluye las respuestas que yo mismo envié como dueño de la oferta —
-      // fetchMensajesRecibidos filtra por publicación, no por remitente.
-      setSolicitudes(data.filter((m) => m.remitente_id !== perfil.id));
-    } finally {
-      setLoadingSolicitudes(false);
-    }
-  }
-
-  async function cargarPostulaciones() {
-    setLoadingPostulaciones(true);
-    try {
-      const data = await fetchMisPostulaciones(perfil.id);
-      // Las ya decididas (aceptada/rechazada) viven en /historial — acá solo
-      // queda lo que sigue esperando la decisión del autor.
-      setPostulaciones(data.filter((m) => m.estado === 'pendiente'));
-    } finally {
-      setLoadingPostulaciones(false);
+      const data = await fetchMisConversaciones(perfil.id);
+      // Solo las de MIS publicaciones: las que abrí yo sobre ofertas ajenas no
+      // dicen nada del avance de mi propia oferta.
+      setConversaciones(data.filter((c) => c.autor_id === perfil.id));
+    } catch {
+      setConversaciones([]);
     }
   }
 
   useEffect(() => {
     cargarMiOferta();
-    cargarSolicitudes();
-    cargarPostulaciones();
+    cargarConversaciones();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil.id]);
-
-  // Al abrir "Mi Oferta" (donde vive "Mis postulaciones") se dan por vistas
-  // las decisiones pendientes de notificar — limpia el badge de la campana
-  // del lado del interesado (0020), mismo criterio que TabMensajes con
-  // marcarMensajesLeidos del lado del autor.
-  useEffect(() => {
-    marcarPostulacionesLeidas(perfil.id).catch(() => {});
-  }, [perfil.id]);
-
-  const seccionPostulaciones = (
-    <MisPostulacionesSeccion postulaciones={postulaciones} loading={loadingPostulaciones} />
-  );
 
   const activa = tabs.find((t) => t.key === subTab) ?? tabs[0];
   // Puede haber varias filas históricas por (tipo, rol_objetivo) — 0018 hizo
@@ -910,11 +835,11 @@ export default function TabMiOferta({ perfil }) {
     ? misPublicaciones.filter((p) => p.tipo === activa.tipo && p.rol_objetivo === activa.rolObjetivo)
     : [];
   const oferta = publicacionesTab.find((p) => !p.estado || p.estado === 'abierta') ?? null;
-  // Cada pestaña es exclusiva: solo se muestran las solicitudes dirigidas a
-  // la publicación de esa pestaña, nunca las de la otra audiencia. Esto es lo
-  // que permite tener las dos ofertas del rol activas a la vez, cada una con
-  // sus propias solicitudes.
-  const solicitudesTab = oferta ? solicitudes.filter((m) => m.publicacion_id === oferta.id) : [];
+  // Cada pestaña es exclusiva: solo cuentan las conversaciones de la
+  // publicación de esa pestaña, nunca las de la otra audiencia. Esto es lo que
+  // permite tener las dos ofertas del rol activas a la vez, cada una con su
+  // propio conteo de cupos.
+  const conversacionesTab = oferta ? conversaciones.filter((c) => c.publicacion_id === oferta.id) : [];
 
   return (
     <div className="flex flex-col gap-4 px-5 py-5 pb-24">
@@ -940,21 +865,19 @@ export default function TabMiOferta({ perfil }) {
           comboFiltro={{ tipo: activa.tipo, rolObjetivo: activa.rolObjetivo }}
           oferta={oferta}
           loading={loading}
-          solicitudes={solicitudesTab}
+          conversaciones={conversacionesTab}
           onOfertaChange={cargarMiOferta}
           onPerfilChange={refreshPerfil}
           showToast={showToast}
         />
       )}
 
-      {seccionPostulaciones}
-
       <button
         type="button"
         onClick={() => navigate('/historial')}
         className="self-start text-[12px] font-medium text-[#1A7A5E]"
       >
-        Ver historial de ofertas y postulaciones cerradas →
+        Ver historial de ofertas y conversaciones cerradas →
       </button>
 
       <Toast message={toast.message} tone={toast.tone} visible={toast.visible} />

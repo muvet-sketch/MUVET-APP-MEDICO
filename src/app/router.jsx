@@ -17,11 +17,13 @@ import Seguimientos from '../screens/seguimientos';
 import N18Recomendaciones from '../screens/n18-recomendaciones';
 import VacunasDesparasitaciones from '../screens/vacunas-desparasitaciones';
 import N26Relevo from '../screens/n26-relevo';
+import ConversacionRelevo from '../screens/n26-relevo/ConversacionRelevo';
 import N27CatalogoServicios from '../screens/n27-catalogo-servicios';
 import N28HomeSimplificado from '../screens/n28-home-simplificado';
 import N29PerfilClinica from '../screens/n29-perfil-clinica';
 import N30CoberturaServicio from '../screens/n30-cobertura-servicio';
 import ChatCobertura from '../screens/n30-cobertura-servicio/ChatCobertura';
+import N31Notificaciones from '../screens/n31-notificaciones';
 import Soporte from '../screens/soporte';
 
 export default function AppRouter() {
@@ -81,8 +83,13 @@ export default function AppRouter() {
       <Route path="/seguimientos" element={<ProtectedRoute allowedRoles={['medico']}><Seguimientos /></ProtectedRoute>} />
       <Route path="/recomendaciones/:servicioId" element={<ProtectedRoute allowedRoles={['medico']}><N18Recomendaciones /></ProtectedRoute>} />
       <Route path="/vacunas/:mascotaId" element={<ProtectedRoute allowedRoles={['medico']}><VacunasDesparasitaciones /></ProtectedRoute>} />
-      {/* /relevo: abierta a los 3 tipos de actor (D-540/D-545). */}
+      {/* /relevo: abierta a los 3 tipos de actor (D-540/D-545). El hilo de
+          negociación va en ruta propia para que las notificaciones de 0027
+          puedan hacer deep-link a una conversación concreta; quién puede
+          abrirla lo decide la RLS de relevo_conversaciones, no el router
+          (mismo criterio que /cobertura-servicio/chat/:solicitudId). */}
       <Route path="/relevo" element={<ProtectedRoute><N26Relevo /></ProtectedRoute>} />
+      <Route path="/relevo/conversacion/:conversacionId" element={<ProtectedRoute><ConversacionRelevo /></ProtectedRoute>} />
       <Route path="/servicios" element={<ProtectedRoute allowedRoles={['medico']}><N27CatalogoServicios /></ProtectedRoute>} />
       <Route path="/perfil-clinica" element={<ProtectedRoute allowedRoles={['clinica']}><N29PerfilClinica /></ProtectedRoute>} />
       {/* Cobertura de Servicio: función nueva médico↔médico (distinta de Relevo/N-26).
@@ -90,6 +97,11 @@ export default function AppRouter() {
           excepción explícita a D-540 (chat en tiempo real) confirmada con el fundador. */}
       <Route path="/cobertura-servicio" element={<ProtectedRoute allowedRoles={['medico']}><N30CoberturaServicio /></ProtectedRoute>} />
       <Route path="/cobertura-servicio/chat/:solicitudId" element={<ProtectedRoute allowedRoles={['medico']}><ChatCobertura /></ProtectedRoute>} />
+      {/* N-31: Notificaciones (migración 0026). Abierta a los 3 actores, igual
+          que /relevo y /historial — las notificaciones de Relevo le llegan a
+          cualquiera de ellos; las de Cobertura (médico↔médico) simplemente no
+          existen para auxiliar ni clínica. */}
+      <Route path="/notificaciones" element={<ProtectedRoute><N31Notificaciones /></ProtectedRoute>} />
       {/* Soporte: abierta a los 3 actores. Es además la pantalla donde aterriza
           quien quedó bloqueado por posible suplantación (0025) — ProtectedRoute
           redirige aquí todo lo demás mientras dure la controversia. */}

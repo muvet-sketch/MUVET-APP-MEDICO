@@ -1,31 +1,45 @@
-// N-28 · Home Auxiliar/Clínica (Fase 7). Dashboard simplificado: solo Relevo
-// + perfil — sin ningún rastro de flujo clínico ni Constelación (D-543).
+// N-28 · Home Auxiliar/Clínica (Fase 7). Dashboard simplificado: solo MUVET
+// Turnos + perfil — sin ningún rastro de flujo clínico ni Constelación (D-543).
+//
+// Mismo orden que la Home del médico (N-2): módulo → ofertas recientes →
+// historial. El botón "👤 Mi perfil" que había aquí desapareció: el perfil se
+// alcanza por la pestaña de la barra inferior en los dos roles.
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { signOut } from '../../lib/auth';
-import { fetchMisPublicaciones, fetchMensajesRecibidos } from '../../lib/relevo';
+import { fetchMisPublicaciones, fetchMisConversaciones } from '../../lib/relevo';
+import { CORTO_TURNOS, NOMBRE_TURNOS } from '../../lib/nombresModulos';
 import { Card, Button, BottomNav, NotificationBell } from '../../components/ui';
+import OfertasRecientes from '../../components/home/OfertasRecientes';
+import HistorialReciente from '../../components/home/HistorialReciente';
 import PerfilAuxiliarInline from './PerfilAuxiliarInline';
 import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
 
 export default function N28HomeSimplificado() {
   const { perfil } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [publicaciones, setPublicaciones] = useState([]);
-  const [mensajesCount, setMensajesCount] = useState(0);
+  const [conversacionesAbiertas, setConversacionesAbiertas] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [mostrarPerfil, setMostrarPerfil] = useState(searchParams.get('perfil') === '1');
+
+  // El panel de perfil del auxiliar se abre y se cierra desde la URL, no desde
+  // un estado propio: la pestaña "Perfil" de la barra inferior navega a
+  // /home-simplificado?perfil=1 y, estando ya en esta pantalla, eso cambia el
+  // search param SIN remontar el componente. Derivarlo aquí es lo que hace que
+  // el panel abra también en ese caso.
+  const mostrarPerfil = searchParams.get('perfil') === '1';
 
   useEffect(() => {
     if (!perfil?.id) return;
     let active = true;
-    Promise.all([fetchMisPublicaciones(perfil.id), fetchMensajesRecibidos(perfil.id)])
-      .then(([pubs, mensajes]) => {
+    Promise.all([fetchMisPublicaciones(perfil.id), fetchMisConversaciones(perfil.id)])
+      .then(([pubs, conversaciones]) => {
         if (!active) return;
         setPublicaciones(pubs.filter((p) => p.activa));
-        setMensajesCount(mensajes.length);
+        // Solo las vivas: una negociación cerrada ya no es algo que atender.
+        setConversacionesAbiertas(conversaciones.filter((c) => c.estado === 'abierta').length);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -57,15 +71,21 @@ export default function N28HomeSimplificado() {
 
       <Card className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[14px] font-semibold text-[#0A1628]">MUVET Relevo</p>
+          <p className="text-[14px] font-semibold text-[#0A1628]">{NOMBRE_TURNOS}</p>
           <p className="text-[12px] text-[#5A6B7A]">
-            {loading ? 'Cargando…' : `${publicaciones.length} publicación(es) activa(s) · ${mensajesCount} mensaje(s)`}
+            {loading
+              ? 'Cargando…'
+              : `${publicaciones.length} publicación(es) activa(s) · ${conversacionesAbiertas} conversación(es) abierta(s)`}
           </p>
         </div>
         <Button variant="outline" fullWidth={false} onClick={() => navigate('/relevo')}>
-          Ir a Relevo
+          {`Ir a ${CORTO_TURNOS}`}
         </Button>
       </Card>
+
+      <OfertasRecientes perfil={perfil} />
+
+      <HistorialReciente perfil={perfil} />
 
       {!loading && publicaciones.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -79,19 +99,9 @@ export default function N28HomeSimplificado() {
         </div>
       )}
 
-      {esClinica ? (
-        <Button variant="ghost" onClick={() => navigate('/perfil-clinica')}>
-          👤 Mi perfil
-        </Button>
-      ) : (
-        <Button variant="ghost" onClick={() => setMostrarPerfil((v) => !v)}>
-          👤 Mi perfil
-        </Button>
-      )}
-
       {!esClinica && mostrarPerfil && (
         <>
-          <PerfilAuxiliarInline onClose={() => setMostrarPerfil(false)} />
+          <PerfilAuxiliarInline onClose={() => setSearchParams({})} />
           {/* El auxiliar configura sus habilidades aquí; la clínica no las
               tiene en perfil (las declara por oferta, ver 0015). */}
           <HabilidadesPerfilSection />

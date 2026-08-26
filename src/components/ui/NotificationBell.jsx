@@ -1,76 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  fetchMensajesNoLeidosCount,
-  subscribeNuevosMensajesRelevo,
-  fetchPostulacionesNoLeidasCount,
-  subscribeDecisionesRelevo,
-} from '../../lib/relevo';
+import useNotificacionesNoLeidas from './useNotificacionesNoLeidas';
 
-// Campana de notificaciones de MUVET Relevo (D-540: mensaje único de
-// contacto). Combina dos avisos independientes, porque cualquier perfil
-// puede estar en ambos lados a la vez: mensajes recibidos sobre mis propias
-// publicaciones (lado autor, pestaña "Mensajes") y decisiones (aceptada /
-// rechazada, 0020) sobre ofertas que validé (lado interesado, "Mi Oferta ›
-// Mis postulaciones").
+// Campana de notificaciones. Hasta 0026 armaba el badge sumando dos consultas
+// a `relevo_mensajes` (mensajes recibidos sin leer + decisiones sin ver) y
+// elegía a qué pestaña de /relevo saltar según cuál de las dos tuviera algo.
+// Ahora hay una tabla `notificaciones` real: el badge es un solo contador y el
+// toque siempre lleva a N-31, que es donde se ve qué pasó y desde donde cada
+// notificación navega a su destino.
 export default function NotificationBell({ perfilId }) {
   const navigate = useNavigate();
-  const [mensajesCount, setMensajesCount] = useState(0);
-  const [decisionesCount, setDecisionesCount] = useState(0);
-
-  const refrescarMensajes = useCallback(() => {
-    if (!perfilId) return;
-    fetchMensajesNoLeidosCount(perfilId)
-      .then(setMensajesCount)
-      .catch(() => {});
-  }, [perfilId]);
-
-  const refrescarDecisiones = useCallback(() => {
-    if (!perfilId) return;
-    fetchPostulacionesNoLeidasCount(perfilId)
-      .then(setDecisionesCount)
-      .catch(() => {});
-  }, [perfilId]);
-
-  useEffect(() => {
-    refrescarMensajes();
-  }, [refrescarMensajes]);
-
-  useEffect(() => {
-    refrescarDecisiones();
-  }, [refrescarDecisiones]);
-
-  useEffect(() => {
-    if (!perfilId) return undefined;
-    const unsubscribe = subscribeNuevosMensajesRelevo(perfilId, () => {
-      setMensajesCount((c) => c + 1);
-    });
-    return unsubscribe;
-  }, [perfilId]);
-
-  useEffect(() => {
-    if (!perfilId) return undefined;
-    const unsubscribe = subscribeDecisionesRelevo(perfilId, () => {
-      setDecisionesCount((c) => c + 1);
-    });
-    return unsubscribe;
-  }, [perfilId]);
-
-  const count = mensajesCount + decisionesCount;
-
-  // Un solo destino posible por toque: si hay mensajes sin leer se prioriza
-  // esa pestaña (es la más urgente, puede ser una postulación nueva sobre mi
-  // oferta); si no, y hay decisiones sin ver, va a "Mi Oferta".
-  function handleClick() {
-    if (mensajesCount > 0) navigate('/relevo?tab=mensajes');
-    else if (decisionesCount > 0) navigate('/relevo?tab=mi-oferta');
-    else navigate('/relevo?tab=mensajes');
-  }
+  const count = useNotificacionesNoLeidas(perfilId);
 
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={() => navigate('/notificaciones')}
       aria-label={count > 0 ? `Notificaciones: ${count} sin leer` : 'Notificaciones'}
       className="relative px-1 text-[18px] text-[#0A1628]"
     >

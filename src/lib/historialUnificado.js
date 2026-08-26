@@ -1,4 +1,8 @@
-// N-9 · Historial único (Cobertura de Servicio + MUVET Relevo).
+// N-9 · Historial único (MUVET Relevo + MUVET Turnos).
+//
+// OJO con los nombres: `cobertura` es el identificador interno de lo que la UI
+// llama "MUVET Relevo", y `relevo` el de lo que la UI llama "MUVET Turnos".
+// Ver el bloque de lib/nombresModulos.js.
 //
 // Antes había tres historiales desconectados, cada uno reimplementando el
 // mismo patrón sobre su propia tabla: N-9 (servicios domiciliarios cerrados),
@@ -14,16 +18,20 @@
 // No hay queries nuevas: se reutilizan las funciones de acceso a datos que ya
 // existían en cada módulo.
 import { fetchHistorial } from './coberturaServicio';
-import { fetchMisPublicaciones, fetchMisPostulaciones } from './relevo';
+import { fetchMisPublicaciones, fetchMisConversaciones } from './relevo';
+import { CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
 
 // Estados terminales de cada fuente — lo que ya terminó y por eso es historial.
 const RELEVO_OFERTA_TERMINAL = ['cancelada', 'finalizada'];
-const RELEVO_POSTULACION_TERMINAL = ['aceptada', 'rechazada'];
+const RELEVO_CONVERSACION_TERMINAL = ['aceptada', 'descartada'];
 
+// Los `value` son identificadores internos y no se tocan; solo cambian las
+// etiquetas. De ahí que 'cobertura' se muestre como "Relevo" y 'relevo' como
+// "Turnos" — es correcto, no es un error de copia.
 export const ORIGENES_HISTORIAL = [
   { value: '', label: 'Todo' },
-  { value: 'cobertura', label: 'Cobertura' },
-  { value: 'relevo', label: 'Relevo' },
+  { value: 'cobertura', label: CORTO_RELEVO },
+  { value: 'relevo', label: CORTO_TURNOS },
 ];
 
 // `origen` distingue cómo se renderiza cada ítem (ver ItemHistorial.jsx);
@@ -32,11 +40,14 @@ function normalizar(origen, familia, fecha, raw) {
   return { id: `${origen}-${raw.id}`, origen, familia, fecha, raw };
 }
 
-export async function fetchHistorialUnificado(perfilId) {
-  const [cobertura, publicaciones, postulaciones] = await Promise.all([
+// `limite` solo recorta el resultado ya ordenado: la agregación es en memoria
+// sobre tres fuentes, así que no hay forma de limitar antes sin desordenar el
+// cruce. Lo usa la vista previa del Home (últimos 3); N-9 la llama sin límite.
+export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
+  const [cobertura, publicaciones, conversaciones] = await Promise.all([
     fetchHistorial(perfilId),
     fetchMisPublicaciones(perfilId),
-    fetchMisPostulaciones(perfilId),
+    fetchMisConversaciones(perfilId),
   ]);
 
   const items = [
@@ -45,21 +56,24 @@ export async function fetchHistorialUnificado(perfilId) {
     // `finalizada_at` — para esas se ordena por su fecha de creación.
     ...cobertura.map((s) => normalizar('cobertura', 'cobertura', s.finalizada_at ?? s.created_at, s)),
 
-    // SUPUESTO: `relevo_publicaciones` no tiene columna de cierre
+    // SUPUESTO: `relevo_publicaciones` sigue sin columna de cierre
     // (`cancelada_at`/`finalizada_at`), solo `created_at` — el estado terminal
-    // lo escribe el trigger de 0018 sin estampar fecha. Los ítems de Relevo se
-    // ordenan por su fecha de creación, así que una oferta publicada hace
-    // meses y cerrada ayer aparece abajo. Resolverlo exige una migración que
-    // agregue `cerrada_at`; fuera de alcance de este cambio.
+    // lo escribe el trigger de 0018 sin estampar fecha, y 0027 no lo cambió
+    // porque el dato que importaba para ordenar el historial (el cierre de la
+    // negociación) sí quedó resuelto con `relevo_conversaciones.cerrada_at`.
+    // Una oferta publicada hace meses y cancelada ayer sigue apareciendo abajo.
     ...publicaciones
       .filter((p) => RELEVO_OFERTA_TERMINAL.includes(p.estado))
       .map((p) => normalizar('relevo_oferta', 'relevo', p.created_at, p)),
 
-    // Mismo caso: `relevo_mensajes` tampoco estampa la fecha de la decisión.
-    ...postulaciones
-      .filter((m) => RELEVO_POSTULACION_TERMINAL.includes(m.estado))
-      .map((m) => normalizar('relevo_postulacion', 'relevo', m.created_at, m)),
+    // Las conversaciones cerradas sí se ordenan por su cierre real (0027).
+    // Entran las de los DOS lados: tanto las que abrí sobre ofertas ajenas
+    // como las que recibí sobre las mías.
+    ...conversaciones
+      .filter((c) => RELEVO_CONVERSACION_TERMINAL.includes(c.estado))
+      .map((c) => normalizar('relevo_conversacion', 'relevo', c.cerrada_at ?? c.ultimo_mensaje_at, c)),
   ];
 
-  return items.sort((a, b) => new Date(b.fecha ?? 0) - new Date(a.fecha ?? 0));
+  const ordenados = items.sort((a, b) => new Date(b.fecha ?? 0) - new Date(a.fecha ?? 0));
+  return limite ? ordenados.slice(0, limite) : ordenados;
 }

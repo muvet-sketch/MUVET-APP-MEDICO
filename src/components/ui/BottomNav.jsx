@@ -1,24 +1,43 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
+import {
+  CORTO_RELEVO,
+  CORTO_TURNOS,
+  ICONO_RELEVO,
+  ICONO_TURNOS,
+} from '../../lib/nombresModulos';
 
-// Barra inferior persistente: Inicio / Relevo / Perfil. Cada rol tiene sus
-// propias rutas (D-543: auxiliar/clínica no tienen flujo clínico ni ruta de
-// perfil dedicada — "Perfil" para auxiliar reabre el panel inline de N-28
-// vía ?perfil=1, ver src/screens/n28-home-simplificado/index.jsx).
+// Barra inferior persistente, cuatro pestañas por rol (D-543: auxiliar y
+// clínica no tienen flujo clínico ni ruta de perfil dedicada — "Perfil" para
+// auxiliar reabre el panel inline de N-28 vía ?perfil=1, ver
+// src/screens/n28-home-simplificado/index.jsx).
+//
+// El tercer lugar lo ocupaba "Alertas" (N-31). Ahora lo ocupa el módulo
+// médico↔médico, que es trabajo accionable; las notificaciones se alcanzan por
+// la campana, que está en el header de los dos Home y en el ScreenHeader de
+// las pantallas no clínicas (ver ScreenHeader, prop `conCampana`).
+//
+// Cobertura/"MUVET Relevo" es exclusiva de médicos (la ruta tiene
+// allowedRoles=['medico']), así que auxiliar y clínica reciben "Historial" en
+// ese lugar. Recordar que los nombres visibles están intercambiados respecto a
+// las rutas: ver lib/nombresModulos.js.
 const TABS_POR_ROL = {
   medico: [
     { key: 'home', label: 'Inicio', icon: '🏠', to: '/home', activo: (p) => p.startsWith('/home') && p !== '/home-simplificado' },
-    { key: 'relevo', label: 'Relevo', icon: '🔄', to: '/relevo', activo: (p) => p.startsWith('/relevo') },
+    { key: 'turnos', label: CORTO_TURNOS, icon: ICONO_TURNOS, to: '/relevo', activo: (p) => p.startsWith('/relevo') },
+    { key: 'relevo', label: CORTO_RELEVO, icon: ICONO_RELEVO, to: '/cobertura-servicio', activo: (p) => p.startsWith('/cobertura-servicio') },
     { key: 'perfil', label: 'Perfil', icon: '👤', to: '/perfil', activo: (p) => p === '/perfil' },
   ],
   auxiliar: [
     { key: 'home', label: 'Inicio', icon: '🏠', to: '/home-simplificado', activo: (p) => p === '/home-simplificado' },
-    { key: 'relevo', label: 'Relevo', icon: '🔄', to: '/relevo', activo: (p) => p.startsWith('/relevo') },
+    { key: 'turnos', label: CORTO_TURNOS, icon: ICONO_TURNOS, to: '/relevo', activo: (p) => p.startsWith('/relevo') },
+    { key: 'historial', label: 'Historial', icon: '📋', to: '/historial', activo: (p) => p.startsWith('/historial') },
     { key: 'perfil', label: 'Perfil', icon: '👤', to: '/home-simplificado?perfil=1', activo: () => false },
   ],
   clinica: [
     { key: 'home', label: 'Inicio', icon: '🏠', to: '/home-simplificado', activo: (p) => p === '/home-simplificado' },
-    { key: 'relevo', label: 'Relevo', icon: '🔄', to: '/relevo', activo: (p) => p.startsWith('/relevo') },
+    { key: 'turnos', label: CORTO_TURNOS, icon: ICONO_TURNOS, to: '/relevo', activo: (p) => p.startsWith('/relevo') },
+    { key: 'historial', label: 'Historial', icon: '📋', to: '/historial', activo: (p) => p.startsWith('/historial') },
     { key: 'perfil', label: 'Perfil', icon: '👤', to: '/perfil-clinica', activo: (p) => p.startsWith('/perfil-clinica') },
   ],
 };
@@ -44,7 +63,9 @@ export default function BottomNav() {
               activo ? 'text-[#1A7A5E]' : 'text-[#5A6B7A]'
             }`}
           >
-            <span className="text-[18px]" aria-hidden="true">{tab.icon}</span>
+            <span className="text-[18px]" aria-hidden="true">
+              {tab.icon}
+            </span>
             {tab.label}
           </button>
         );

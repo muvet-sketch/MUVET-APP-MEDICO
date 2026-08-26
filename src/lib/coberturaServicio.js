@@ -24,7 +24,8 @@ export const TIPOS_SERVICIO_COBERTURA = [
   'Curación / procedimiento menor',
   'Control post-quirúrgico',
   'Toma de muestras',
-  'Urgencia',
+  'Aplicación de medicamentos',
+  'Eutanasia',
   'Otro',
 ];
 
@@ -225,7 +226,7 @@ export async function enviarMensajeChat({ solicitudId, remitenteId, mensaje, arc
 }
 
 // Realtime del chat mientras la pantalla está abierta — mismo patrón que
-// subscribeNuevosMensajesRelevo en lib/relevo.js, filtrando por
+// subscribeNotificaciones en lib/notificaciones.js, filtrando por
 // solicitud_id (columna simple, sí se puede filtrar directo en
 // postgres_changes).
 export function subscribeMensajesChat(solicitudId, onNuevoMensaje) {

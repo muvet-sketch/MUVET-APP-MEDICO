@@ -1,19 +1,17 @@
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui';
+import { ICONO_TURNOS, NOMBRE_TURNOS } from '../../lib/nombresModulos';
 
+// Solo lo que no está ya en la barra inferior ni tiene sección propia en el
+// Home: Perfil y MUVET Relevo (ex Cobertura) viven en la barra, e Historial
+// tiene su propia vista previa más abajo.
 const LINKS = [
   { to: '/servicios', label: '🏠 Domicilios' },
-  { to: '/historial', label: 'Historial' },
-  { to: '/relevo', label: 'MUVET Relevo' },
-  // Cobertura de Servicio: función nueva médico↔médico, exclusiva de
-  // médicos — N-2 Home ya está restringida a rol='medico' en el router, así
-  // que el botón queda automáticamente exclusivo sin lógica extra acá.
-  { to: '/cobertura-servicio', label: '🤝 Cobertura de Servicio' },
-  { to: '/perfil', label: '👤 Perfil' },
+  { to: '/relevo', label: `${ICONO_TURNOS} ${NOMBRE_TURNOS}` },
 ];
 
-// D-549: tercer acceso rápido, visible solo si el médico tiene disponibilidad
-// activa o un servicio en curso — lleva a N-26 con filtro pre-aplicado a
+// D-549: acceso rápido visible solo si el médico tiene disponibilidad activa o
+// un servicio en curso — lleva a MUVET Turnos con filtro pre-aplicado a
 // auxiliares con disponibilidad publicada.
 const BUSCAR_AUXILIAR_LINK = { to: '/relevo?tipo=ofrezco&rol=auxiliar', label: '🧰 Buscar auxiliar' };
 

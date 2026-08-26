@@ -71,8 +71,22 @@ Violar cualquiera de estas reglas invalida el trabajo entregado.
   configure al menos un servicio con precio > 0 en N-27.
 - **D-539** — Sustancias controladas → aviso al médico (Resolución 1478/2006
   de Colombia), **sin bloqueo**.
-- **D-540** — Relevo es un mensaje único de contacto. Sin chat en tiempo real,
-  sin hilo de conversación.
+- **D-540** — La bolsa gremial (N-26, ruta `/relevo`, tablas `relevo_*` — de
+  cara al usuario **MUVET Turnos**; ver `src/lib/nombresModulos.js`) se negocia
+  en una **conversación 1:1 privada** entre las dos partes de una postulación
+  (`relevo_conversaciones` + los mensajes de `relevo_mensajes.conversacion_id`),
+  que vive **solo mientras dura la negociación**: al aceptarse o descartarse, el
+  hilo se cierra a mensajes nuevos. Sin adjuntos y sin tiempo real. El turno se
+  cierra únicamente con el **acuerdo de ambas partes** (`acuerdo_autor` +
+  `acuerdo_interesado`); `estado` lo deriva un trigger en BD, nunca el cliente.
+  Los datos de contacto directo (teléfono, dirección de sede) solo se revelan
+  una vez la conversación queda `aceptada` — mismo criterio que D-064.
+
+  *Modificación al D-540 original ("mensaje único de contacto, sin chat en
+  tiempo real, sin hilo de conversación") confirmada con el fundador — ver
+  `supabase/migrations/0027`. La excepción del módulo médico↔médico (N-30,
+  `cobertura_*`, hoy **MUVET Relevo** en la UI — `0023`, chat en tiempo real con
+  adjuntos) sigue siendo aparte y más amplia.*
 - **D-552** — N-8 incluye logo/firma del médico (PNG/JPG ≤2MB) que se estampa
   en Fórmula (N-12) y Recomendaciones (N-18). Si no hay imagen: placeholder de
   iniciales + nombre + matrícula.

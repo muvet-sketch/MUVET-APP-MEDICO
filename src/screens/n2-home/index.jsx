@@ -11,7 +11,8 @@ import {
 } from '../../lib/solicitudes';
 import ValidationBadge from './ValidationBadge';
 import QuickAccess from './QuickAccess';
-import OfertasRecientes from './OfertasRecientes';
+import OfertasRecientes from '../../components/home/OfertasRecientes';
+import HistorialReciente from '../../components/home/HistorialReciente';
 import { Card, Button, Toast, BottomNav, NotificationBell } from '../../components/ui';
 import N3Solicitudes from '../n3-solicitudes';
 
@@ -142,9 +143,12 @@ export default function N2Home() {
       <QuickAccess disponible={perfil.disponible} servicioActivo={servicioActivo} />
 
       {/* "Actividad reciente" (mock) se movió a N-27 · Mis Domicilios, que es
-          su módulo real. Este espacio lo ocupan ahora las ofertas de Relevo
-          abiertas, que sí son accionables desde la Home. */}
+          su módulo real. Este espacio lo ocupan ahora las ofertas de MUVET
+          Turnos abiertas, que sí son accionables desde la Home, y debajo la
+          vista previa del historial único. Mismo orden en N-28. */}
       <OfertasRecientes perfil={perfil} />
+
+      <HistorialReciente perfil={perfil} />
 
       {solicitudPendiente && (
         <N3Solicitudes

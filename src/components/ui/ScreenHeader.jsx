@@ -1,7 +1,15 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../app/AuthContext';
+import NotificationBell from './NotificationBell';
 
-export default function ScreenHeader({ title, fallbackTo = '/home' }) {
+// `conCampana` va apagado por defecto a propósito. Este header también viste
+// las pantallas del flujo clínico (N-15 SOAP, N-4 Constelación, N-12 Fórmula…),
+// donde una campana que navega fuera a media consulta es un riesgo de perder
+// trabajo en curso. Se enciende solo en las pantallas no clínicas, que es
+// donde reemplaza al desaparecido tab "Alertas" de BottomNav.
+export default function ScreenHeader({ title, fallbackTo = '/home', conCampana = false }) {
   const navigate = useNavigate();
+  const { perfil } = useAuth();
 
   function handleBack() {
     if (window.history.length > 1) {
@@ -21,7 +29,8 @@ export default function ScreenHeader({ title, fallbackTo = '/home' }) {
       >
         ←
       </button>
-      <h1 className="text-[16px] font-semibold text-[#0A1628]">{title}</h1>
+      <h1 className="flex-1 text-[16px] font-semibold text-[#0A1628]">{title}</h1>
+      {conCampana && perfil?.id && <NotificationBell perfilId={perfil.id} />}
     </div>
   );
 }

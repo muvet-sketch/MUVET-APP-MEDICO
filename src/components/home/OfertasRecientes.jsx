@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge } from '../../components/ui';
+import { Card, Badge } from '../ui';
 import { formatCOP, truncarTexto } from '../../lib/format';
 import { fetchPublicacionesActivas, filtrarPublicacionesPorZona, formatFranjaHoraria } from '../../lib/relevo';
 
-// Ocupa el lugar que tenía "Actividad reciente" (mock), que se movió a su
-// módulo real: N-27 · Mis Domicilios. Aquí va lo que sí es accionable desde la
-// Home en el lanzamiento inicial: las ofertas de Relevo abiertas ahora mismo.
+// Vista previa de MUVET Turnos en el Home. Vivía en screens/n2-home, pero
+// desde la reorganización de los Home la comparten los tres roles (N-2 para el
+// médico, N-28 para auxiliar y clínica), así que subió a components/home.
 //
-// Mismo conjunto que verá en /relevo → pestaña "Ofertas": publicaciones
+// Mismo conjunto que se ve en /relevo → pestaña "Ofertas": publicaciones
 // activas dirigidas a su rol, excluyendo las propias y filtradas por la zona
 // de cobertura del perfil (filtrarPublicacionesPorZona, compartido con
 // TabOfertas). Es una vista de entrada, no el tablón: sin acciones, el clic
-// lleva a Relevo.
+// lleva a MUVET Turnos.
 const MAX_OFERTAS = 3;
 
 const ACTOR_BADGE = {
@@ -37,8 +37,8 @@ export default function OfertasRecientes({ perfil }) {
         setOfertas(filtrarPublicacionesPorZona(ajenas, perfil.zona_cobertura).slice(0, MAX_OFERTAS));
       })
       .catch(() => {
-        // La Home no debe romperse por el tablón de Relevo: si falla, la
-        // sección queda vacía y el médico igual puede entrar a /relevo.
+        // La Home no debe romperse por el tablón de Turnos: si falla, la
+        // sección queda vacía y el usuario igual puede entrar a /relevo.
         if (active) setOfertas([]);
       })
       .finally(() => {
