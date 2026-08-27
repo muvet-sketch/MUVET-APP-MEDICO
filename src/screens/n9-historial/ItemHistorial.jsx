@@ -1,7 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, Badge } from '../../components/ui';
 import { formatFechaCorta } from '../../lib/format';
-import { NOMBRE_RELEVO, NOMBRE_TURNOS, ICONO_RELEVO, ICONO_TURNOS } from '../../lib/nombresModulos';
+import {
+  NOMBRE_AUXILIAR,
+  NOMBRE_RELEVO,
+  NOMBRE_TURNOS,
+  ICONO_AUXILIAR,
+  ICONO_RELEVO,
+  ICONO_TURNOS,
+} from '../../lib/nombresModulos';
+import { labelSubtipo } from '../../lib/apoyo';
 import SolicitudCard from '../n30-cobertura-servicio/SolicitudCard';
 
 // Cada ítem del historial único se pinta según su origen. La tarjeta de N-30 se
@@ -16,6 +24,7 @@ const ORIGEN_LABEL = {
   cobertura: `${ICONO_RELEVO} ${NOMBRE_RELEVO}`,
   relevo_oferta: `${ICONO_TURNOS} ${NOMBRE_TURNOS} · mi oferta`,
   relevo_conversacion: `${ICONO_TURNOS} ${NOMBRE_TURNOS} · conversación`,
+  apoyo_conversacion: `${ICONO_AUXILIAR} ${NOMBRE_AUXILIAR} · servicio`,
 };
 
 const ESTADO_OFERTA_BADGE = {
@@ -23,8 +32,10 @@ const ESTADO_OFERTA_BADGE = {
   finalizada: { label: 'Finalizada', tone: 'ok' },
 };
 
+// 0028: 'aceptada' ya no llega al historial (sigue en curso, con el chat
+// abierto, hasta que alguien finaliza el servicio).
 const ESTADO_CONVERSACION_BADGE = {
-  aceptada: { label: 'Turno confirmado', tone: 'ok' },
+  finalizada: { label: 'Servicio finalizado', tone: 'ok' },
   descartada: { label: 'Descartada', tone: 'critical' },
 };
 
@@ -64,6 +75,35 @@ export default function ItemHistorial({ item, perfilId }) {
           <Badge tone={badge.tone}>{badge.label}</Badge>
         </div>
         {raw.zona && <p className="text-[12px] text-[#5A6B7A]">📍 {raw.zona}</p>}
+        <OrigenTag origen={origen} fecha={fecha} />
+      </Card>
+    );
+  }
+
+  // apoyo_conversacion — un servicio médico↔auxiliar ya cerrado (0028). A
+  // diferencia de Cobertura, su chat NO se borró al finalizar: el enlace abre
+  // el hilo completo en solo lectura.
+  if (origen === 'apoyo_conversacion') {
+    const badgeApoyo = ESTADO_CONVERSACION_BADGE[raw.estado] ?? { label: raw.estado, tone: 'neutral' };
+    const nombre = raw.otro?.nombre_completo || raw.otro?.razon_social || 'Usuario MUVET';
+    return (
+      <Card className="flex flex-col gap-2">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-[14px] font-medium text-[#0A1628]">{nombre}</p>
+          <Badge tone={badgeApoyo.tone}>{badgeApoyo.label}</Badge>
+        </div>
+        <p className="text-[12px] text-[#5A6B7A]">{labelSubtipo(raw.servicio_subtipo)}</p>
+        <p className="text-[12px] text-[#5A6B7A]">
+          {raw.publicacion?.descripcion || '(sin descripción)'}
+          {raw.publicacion?.zona ? ` · ${raw.publicacion.zona}` : ''}
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate(`/apoyo/conversacion/${raw.id}`)}
+          className="self-start text-[12px] font-medium text-[#1A7A5E]"
+        >
+          Ver conversación →
+        </button>
         <OrigenTag origen={origen} fecha={fecha} />
       </Card>
     );

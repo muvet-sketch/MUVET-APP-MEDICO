@@ -9,4 +9,5 @@ export { default as Toast } from './Toast';
 export { default as ScreenHeader } from './ScreenHeader';
 export { default as BottomNav } from './BottomNav';
 export { default as NotificationBell } from './NotificationBell';
+export { default as AppMenu } from './AppMenu';
 export { default as ProgressSteps } from './ProgressSteps';

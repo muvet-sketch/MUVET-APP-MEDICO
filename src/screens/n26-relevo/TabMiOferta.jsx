@@ -41,26 +41,19 @@ const MIGRAR_TIPO_JORNADA = { 'Día completo': 'Turno completo', 'Medio día': '
 // elegir el turno o al cambiar la hora de inicio, y el usuario puede
 // sobreescribirla directamente si el turno real no calza con el preset.
 const DURACION_PREDETERMINADA = { 'Turno completo': 8, 'Medio turno': 4, 'Turno 12 Horas': 12, 'Varios días': 8 };
-// Procedimientos que un médico puede solicitarle a un auxiliar (aparte de
-// pedir su apoyo por jornada completa) — pedido puntual para la combinación
-// médico → auxiliar (busco:auxiliar).
-const PROCEDIMIENTOS_AUXILIAR = [
-  'Asistencia en consulta',
-  'Asistencia en cirugía',
-  'Asistencia en ecografía',
-  'Asistencia en rayos X',
-  'Toma de muestras',
-];
 // Etiquetas de cada combinación (tipo, rol_objetivo) permitida por rol —
 // ver PUBLICACIONES_PERMITIDAS_POR_ROL en lib/relevo.js (D-545 revisado).
+//
+// 0028: se cayeron 'busco:auxiliar' del médico y 'ofrezco:medico' del
+// auxiliar. Ese matching médico↔auxiliar se mudó a MUVET Auxiliar (/apoyo),
+// que sí distingue acompañamiento de tarea en domicilio. Lo que queda acá
+// siempre involucra a una clínica.
 const OPCION_LABEL_POR_ROL = {
   medico: {
     'ofrezco:clinica': 'Ofrezco disponibilidad a establecimientos',
-    'busco:auxiliar': 'Solicito apoyo de un auxiliar',
   },
   auxiliar: {
     'ofrezco:clinica': 'Ofrezco disponibilidad a establecimientos',
-    'ofrezco:medico': 'Ofrezco disponibilidad a médicos',
   },
   clinica: {
     'busco:medico': 'Busco médico',
@@ -77,7 +70,15 @@ const ESTADO_PUBLICACION_BADGE = {
 };
 
 
-function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast, onPerfilChange }) {
+function OfertaForm({ perfil, initial, plantilla, comboFiltro, onSaved, onCancel, onLimpiarPlantilla, showToast, onPerfilChange }) {
+  // `initial` = fila que se está EDITANDO (guarda con actualizarPublicacion).
+  // `plantilla` = fila terminal (finalizada/cancelada) que se reutiliza para
+  // "volver a publicar" — pre-rellena el formulario pero se guarda como fila
+  // NUEVA (crearPublicacion). `base` es de dónde salen los valores iniciales;
+  // el modo (crear/editar) y el bloqueo del selector de tipo siguen mirando
+  // solo a `initial`. Las FECHAS son la excepción: no se copian de la
+  // plantilla (serían fechas pasadas) — arrancan en hoy como una oferta nueva.
+  const base = initial ?? plantilla ?? null;
   // Opciones de (tipo, rol_objetivo) permitidas para este rol (D-545
   // revisado) con su etiqueta. `initial` fija cuál se usó al crear — no se
   // puede cambiar al editar (mismo criterio que antes para `rolObjetivo`).
@@ -92,19 +93,16 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
   const opciones = comboFiltro
     ? opcionesRol.filter((o) => o.tipo === comboFiltro.tipo && o.rolObjetivo === comboFiltro.rolObjetivo)
     : opcionesRol;
-  const initialKey = initial ? `${initial.tipo}:${initial.rol_objetivo}` : opciones[0]?.key;
+  const initialKey = base ? `${base.tipo}:${base.rol_objetivo}` : opciones[0]?.key;
   const [opcionKey, setOpcionKey] = useState(initialKey);
   const opcionSeleccionada = opciones.find((o) => o.key === opcionKey) ?? opciones[0];
 
-  // Solo el médico solicitando apoyo a un auxiliar (busco:auxiliar) puede
-  // definir la oferta por procedimiento en vez de por jornada — pedido
-  // puntual para esa combinación, no aplica a las demás.
-  const puedeElegirProcedimiento = perfil.rol === 'medico' && opcionSeleccionada?.rolObjetivo === 'auxiliar';
-  const [modoOferta, setModoOferta] = useState(initial?.procedimientos?.length > 0 ? 'procedimiento' : 'jornada');
-  const [procedimientos, setProcedimientos] = useState(initial?.procedimientos ?? []);
-  const mostrarJornada = !puedeElegirProcedimiento || modoOferta === 'jornada';
+  // El modo "por procedimiento" (0021) se retiró en 0028 junto con la
+  // combinación busco:auxiliar, que era la única que lo usaba. Definir un
+  // servicio por procedimiento es ahora asunto de MUVET Auxiliar (/apoyo), que
+  // lo modela con `servicio_subtipo`. Todo lo que queda acá va por jornada.
 
-  const [descripcion, setDescripcion] = useState(initial?.descripcion ?? '');
+  const [descripcion, setDescripcion] = useState(base?.descripcion ?? '');
   // La clínica tiene una sola sede física (D-544): su "zona" de la oferta es
   // la dirección del establecimiento, de solo lectura, no un catálogo de
   // zonas para elegir (eso es para médico/auxiliar, que se desplazan).
@@ -114,18 +112,21 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
   // de texto libre, para que el matching por zona en TabOfertas compare
   // valores consistentes (antes un Input libre no ofrecía ningún buscador
   // real ni garantizaba que el texto coincidiera con el catálogo).
-  const [zonas, setZonas] = useState(parseZonas(initial?.zona ?? perfil.zona_cobertura));
+  // Arranca con las zonas de la oferta previa (editada o reutilizada) o, si no
+  // hay, con las que el médico/auxiliar ya configuró en su perfil — colapsadas
+  // y editables desde el propio campo.
+  const [zonas, setZonas] = useState(parseZonas(base?.zona ?? perfil.zona_cobertura));
   const [tipoJornada, setTipoJornada] = useState(
-    MIGRAR_TIPO_JORNADA[initial?.tipo_jornada] ?? initial?.tipo_jornada ?? TIPO_JORNADA[0],
+    MIGRAR_TIPO_JORNADA[base?.tipo_jornada] ?? base?.tipo_jornada ?? TIPO_JORNADA[0],
   );
   // Medio turno / Turno completo arrancan en hoy (un solo día); Varios días
   // arranca vacío para que el rango lo defina el usuario. Por procedimiento
   // también es de un solo día (mismo criterio que medio turno/turno completo).
   const [fechaInicio, setFechaInicio] = useState(
-    initial?.fecha_inicio ?? (tipoJornada === 'Varios días' && mostrarJornada ? '' : new Date().toISOString().slice(0, 10)),
+    initial?.fecha_inicio ?? (tipoJornada === 'Varios días' ? '' : new Date().toISOString().slice(0, 10)),
   );
   const [fechaFin, setFechaFin] = useState(
-    initial?.fecha_fin ?? (tipoJornada === 'Varios días' && mostrarJornada ? '' : new Date().toISOString().slice(0, 10)),
+    initial?.fecha_fin ?? (tipoJornada === 'Varios días' ? '' : new Date().toISOString().slice(0, 10)),
   );
   // Franja horaria (0021, revisado en 0022): la hora de fin ya no depende de
   // un campo de "duración" que el usuario deba escribir — se autocompleta al
@@ -133,25 +134,36 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
   // Horas) o al cambiar la hora de inicio. Sigue siendo un input normal, así
   // que el usuario puede sobreescribirla después si el turno real no calza
   // con el preset.
-  const [horaInicio, setHoraInicio] = useState(initial?.hora_inicio?.slice(0, 5) ?? '08:00');
+  const [horaInicio, setHoraInicio] = useState(base?.hora_inicio?.slice(0, 5) ?? '08:00');
   const [horaFin, setHoraFin] = useState(
-    initial?.hora_fin?.slice(0, 5) ||
-      sumarHoras(initial?.hora_inicio?.slice(0, 5) ?? '08:00', DURACION_PREDETERMINADA[tipoJornada] ?? 8),
+    base?.hora_fin?.slice(0, 5) ||
+      sumarHoras(base?.hora_inicio?.slice(0, 5) ?? '08:00', DURACION_PREDETERMINADA[tipoJornada] ?? 8),
   );
 
   function handleHoraInicio(value) {
     setHoraInicio(value);
     setHoraFin(sumarHoras(value, DURACION_PREDETERMINADA[tipoJornada] ?? 8));
   }
-  const [tarifa, setTarifa] = useState(initial?.tarifa ?? '');
-  const [turnos, setTurnos] = useState(initial?.turnos ?? []);
+  const [tarifa, setTarifa] = useState(base?.tarifa ?? '');
+  const [turnos, setTurnos] = useState(base?.turnos ?? []);
   const [nuevoTurno, setNuevoTurno] = useState('');
-  const habilidades = initial?.habilidades ?? [];
+  const habilidades = base?.habilidades ?? [];
   // Cupos (0016): solo la clínica puede pedir varios médicos o auxiliares con
   // una misma publicación; médico y auxiliar se ofrecen a sí mismos (1).
-  const [cupos, setCupos] = useState(initial?.cupos ?? 1);
+  const [cupos, setCupos] = useState(base?.cupos ?? 1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // "Detalles opcionales" arranca cerrado para que publicar sea corto; se abre
+  // solo si la oferta base ya traía algo en esos campos (al editar o reutilizar).
+  const [detallesAbiertos, setDetallesAbiertos] = useState(
+    Boolean(
+      base?.descripcion ||
+        base?.turnos?.length ||
+        base?.habilidades?.length ||
+        base?.habilidades_profesionales?.length ||
+        base?.habilidades_personales?.length,
+    ),
+  );
 
   // Habilidades de catálogo (0015). Médico y auxiliar arrancan una oferta
   // nueva con lo que tengan configurado en su perfil; al guardar se escribe
@@ -162,13 +174,13 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
   const usaPerfil = tieneHabilidadesDePerfil(perfil.rol);
   const [habProfesionales, setHabProfesionales] = useState(
     normalizarHabilidades(
-      initial?.habilidades_profesionales ?? (usaPerfil ? perfil.habilidades_profesionales : []),
+      base?.habilidades_profesionales ?? (usaPerfil ? perfil.habilidades_profesionales : []),
       HABILIDADES_PROFESIONALES,
     ),
   );
   const [habPersonales, setHabPersonales] = useState(
     normalizarHabilidades(
-      initial?.habilidades_personales ?? (usaPerfil ? perfil.habilidades_personales : []),
+      base?.habilidades_personales ?? (usaPerfil ? perfil.habilidades_personales : []),
       HABILIDADES_PERSONALES,
     ),
   );
@@ -213,19 +225,18 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
     setSaving(true);
     try {
       const tarifaNum = tarifa === '' ? null : Number(tarifa);
-      // Por jornada y por procedimiento son mutuamente excluyentes: se manda
-      // uno u otro, nunca los dos, para que la etiqueta de la oferta no
-      // mezcle una jornada con procedimientos de una elección anterior.
       const campos = {
         descripcion,
         zona: esClinica ? zonaClinica : serializarZonas(zonas),
         fechaInicio,
         fechaFin,
-        tipoJornada: mostrarJornada ? tipoJornada : null,
+        tipoJornada,
         horaInicio,
         horaFin,
         duracionHoras: calcularDuracionHoras(horaInicio, horaFin),
-        procedimientos: puedeElegirProcedimiento && modoOferta === 'procedimiento' ? procedimientos : [],
+        // 0028: se retiró el modo "por procedimiento" junto con busco:auxiliar.
+        // La columna se conserva por las filas históricas; ya no se escribe.
+        procedimientos: [],
         tarifa: tarifaNum,
         turnos,
         habilidades,
@@ -267,6 +278,21 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <p className="text-[14px] font-semibold text-[#0A1628]">{opcionSeleccionada?.label ?? 'Publicar'}</p>
 
+      {plantilla && !initial && (
+        <div className="flex items-start justify-between gap-2 rounded-[10px] border border-[#1A7A5E] bg-[#1A7A5E1A] px-3 py-2.5">
+          <p className="text-[12px] text-[#0A1628]">
+            Rellenamos el formulario con tu oferta anterior. Revisa la fecha y publica.
+          </p>
+          <button
+            type="button"
+            onClick={onLimpiarPlantilla}
+            className="shrink-0 text-[12px] font-medium text-[#1A7A5E]"
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
+
       {opciones.length > 1 && (
         <div className="w-full text-left">
           <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Tipo de publicación</label>
@@ -288,19 +314,6 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
         </div>
       )}
 
-      <div className="w-full text-left">
-        <label htmlFor="descripcion" className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">
-          Descripción
-        </label>
-        <textarea
-          id="descripcion"
-          rows={3}
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-          className="w-full rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2.5 text-[14px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
-        />
-      </div>
-
       {esClinica ? (
         <div className="w-full text-left">
           <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Zona / Ciudad</label>
@@ -310,66 +323,35 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
         </div>
       ) : (
         <ChipMultiSelect
+          collapsible
           searchable
           label={`Zona / Ciudad (${zonas.length})`}
+          hint="Ya vienen tus zonas habituales. Toca “Modificar” para ajustarlas solo para esta oferta."
           options={ZONAS_COBERTURA}
           value={zonas}
           onChange={setZonas}
         />
       )}
 
-      {puedeElegirProcedimiento && (
-        <div className="w-full text-left">
-          <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">¿Cómo defines esta oferta?</label>
-          <div className="flex gap-2">
-            {[
-              { value: 'jornada', label: 'Por jornada' },
-              { value: 'procedimiento', label: 'Por procedimiento' },
-            ].map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                onClick={() => setModoOferta(o.value)}
-                className={`flex-1 rounded-[10px] border px-2 py-2 text-[12px] ${
-                  modoOferta === o.value ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+      <div className="w-full text-left">
+        <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Jornada</label>
+        <div className="flex flex-wrap gap-2">
+          {TIPO_JORNADA.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => handleTipoJornada(t)}
+              className={`min-w-[45%] flex-1 rounded-[10px] border px-2 py-2 text-[12px] ${
+                tipoJornada === t ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
-      {mostrarJornada ? (
-        <div className="w-full text-left">
-          <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Jornada</label>
-          <div className="flex flex-wrap gap-2">
-            {TIPO_JORNADA.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => handleTipoJornada(t)}
-                className={`min-w-[45%] flex-1 rounded-[10px] border px-2 py-2 text-[12px] ${
-                  tipoJornada === t ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <ChipMultiSelect
-          allowCustom
-          label={`Procedimientos solicitados (${procedimientos.length})`}
-          options={PROCEDIMIENTOS_AUXILIAR}
-          value={procedimientos}
-          onChange={setProcedimientos}
-        />
-      )}
-
-      {mostrarJornada && tipoJornada === 'Varios días' ? (
+      {tipoJornada === 'Varios días' ? (
         <div className="flex gap-2">
           <Input label="Desde" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
           <Input label="Hasta" type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
@@ -413,74 +395,104 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
         onChange={(e) => setTarifa(e.target.value)}
       />
 
-      <div className="w-full text-left">
-        <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">
-          Disponibilidad ofrecida (elige una o varias)
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {[...TURNOS_OPCIONES, ...turnos.filter((t) => !TURNOS_OPCIONES.includes(t))]
-            .map((t) => {
-              const esPersonalizado = !TURNOS_OPCIONES.includes(t);
-              const seleccionado = turnos.includes(t);
-              return (
-                <button
-                  key={t}
+      {/* Todo lo que no hace falta para publicar rápido vive plegado acá:
+          descripción, disponibilidad ofrecida y los dos catálogos de
+          habilidades. Se abre solo si la oferta base ya traía algo. */}
+      <div className="w-full rounded-[10px] border border-[#E1E8ED]">
+        <button
+          type="button"
+          onClick={() => setDetallesAbiertos((v) => !v)}
+          className="flex w-full items-center justify-between px-3 py-2.5 text-[13px] font-medium text-[#0A1628]"
+        >
+          <span>Detalles opcionales</span>
+          <span className="text-[12px] font-medium text-[#1A7A5E]">{detallesAbiertos ? 'Ocultar' : 'Mostrar'}</span>
+        </button>
+
+        {detallesAbiertos && (
+          <div className="flex flex-col gap-3 border-t border-[#E1E8ED] px-3 py-3">
+            <div className="w-full text-left">
+              <label htmlFor="descripcion" className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">
+                Descripción
+              </label>
+              <textarea
+                id="descripcion"
+                rows={3}
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                className="w-full rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2.5 text-[14px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
+              />
+            </div>
+
+            <div className="w-full text-left">
+              <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">
+                Disponibilidad ofrecida (elige una o varias)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[...TURNOS_OPCIONES, ...turnos.filter((t) => !TURNOS_OPCIONES.includes(t))].map((t) => {
+                  const esPersonalizado = !TURNOS_OPCIONES.includes(t);
+                  const seleccionado = turnos.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => (esPersonalizado ? quitarTurno(t) : toggleTurno(t))}
+                      className={`rounded-[10px] border px-3 py-2 text-[12px] ${
+                        seleccionado ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
+                      }`}
+                    >
+                      {seleccionado ? '✓ ' : ''}
+                      {t}
+                      {esPersonalizado ? ' ×' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={nuevoTurno}
+                  onChange={(e) => setNuevoTurno(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      agregarTurno();
+                    }
+                  }}
+                  placeholder="Otro…"
+                  className="flex-1 rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2 text-[13px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
+                />
+                <Button
                   type="button"
-                  onClick={() => (esPersonalizado ? quitarTurno(t) : toggleTurno(t))}
-                  className={`rounded-[10px] border px-3 py-2 text-[12px] ${
-                    seleccionado ? 'border-[#1A7A5E] bg-[#1A7A5E1A] text-[#0A1628]' : 'border-[#E1E8ED] text-[#0A1628]'
-                  }`}
+                  variant="outline"
+                  fullWidth={false}
+                  className="!w-auto px-3 py-2 text-[12px]"
+                  onClick={agregarTurno}
                 >
-                  {seleccionado ? '✓ ' : ''}
-                  {t}
-                  {esPersonalizado ? ' ×' : ''}
-                </button>
-              );
-            })}
-        </div>
-        <div className="mt-2 flex gap-2">
-          <input
-            value={nuevoTurno}
-            onChange={(e) => setNuevoTurno(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                agregarTurno();
-              }
-            }}
-            placeholder="Otro…"
-            className="flex-1 rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2 text-[13px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            fullWidth={false}
-            className="!w-auto px-3 py-2 text-[12px]"
-            onClick={agregarTurno}
-          >
-            + Agregar
-          </Button>
-        </div>
+                  + Agregar
+                </Button>
+              </div>
+            </div>
+
+            <ChipMultiSelect
+              collapsible
+              allowCustom
+              label={usaPerfil ? 'Habilidades profesionales' : 'Habilidades profesionales que esperas del candidato'}
+              hint={usaPerfil ? 'También puedes configurarlas desde tu perfil.' : undefined}
+              options={HABILIDADES_PROFESIONALES}
+              value={habProfesionales}
+              onChange={setHabProfesionales}
+            />
+
+            <ChipMultiSelect
+              collapsible
+              allowCustom
+              label={usaPerfil ? 'Habilidades personales' : 'Habilidades personales que esperas del candidato'}
+              options={HABILIDADES_PERSONALES}
+              value={habPersonales}
+              onChange={setHabPersonales}
+            />
+          </div>
+        )}
       </div>
-
-      <ChipMultiSelect
-        collapsible
-        allowCustom
-        label={usaPerfil ? 'Habilidades profesionales' : 'Habilidades profesionales que esperas del candidato'}
-        hint={usaPerfil ? 'También puedes configurarlas desde tu perfil.' : undefined}
-        options={HABILIDADES_PROFESIONALES}
-        value={habProfesionales}
-        onChange={setHabProfesionales}
-      />
-
-      <ChipMultiSelect
-        collapsible
-        allowCustom
-        label={usaPerfil ? 'Habilidades personales' : 'Habilidades personales que esperas del candidato'}
-        options={HABILIDADES_PERSONALES}
-        value={habPersonales}
-        onChange={setHabPersonales}
-      />
 
       {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}
 
@@ -504,15 +516,12 @@ function OfertaForm({ perfil, initial, comboFiltro, onSaved, onCancel, showToast
 // editar, solicitudes propias) sin mezclar audiencias. Esto es lo que permite
 // "crear una oferta nueva": basta con cambiar de pestaña y publicar la que
 // falte, sin perder la que ya está activa en la otra.
+//
+// 0028: médico y auxiliar quedan con UNA sola pestaña (a clínicas). Su
+// matching mutuo se mudó a MUVET Auxiliar (/apoyo).
 const TABS_POR_ROL = {
-  medico: [
-    { key: 'clinica', tipo: 'ofrezco', rolObjetivo: 'clinica', label: 'A clínicas' },
-    { key: 'auxiliar', tipo: 'busco', rolObjetivo: 'auxiliar', label: 'Busco auxiliar' },
-  ],
-  auxiliar: [
-    { key: 'clinica', tipo: 'ofrezco', rolObjetivo: 'clinica', label: 'Clínicas' },
-    { key: 'medico', tipo: 'ofrezco', rolObjetivo: 'medico', label: 'Apoyo Médico' },
-  ],
+  medico: [{ key: 'clinica', tipo: 'ofrezco', rolObjetivo: 'clinica', label: 'A clínicas' }],
+  auxiliar: [{ key: 'clinica', tipo: 'ofrezco', rolObjetivo: 'clinica', label: 'A clínicas' }],
   clinica: [
     { key: 'medico', tipo: 'busco', rolObjetivo: 'medico', label: 'Busco médico' },
     { key: 'auxiliar', tipo: 'busco', rolObjetivo: 'auxiliar', label: 'Busco auxiliar' },
@@ -553,9 +562,15 @@ function HabilidadesOferta({ oferta, esperadas }) {
 // las conversaciones en sí se gestionan en la pestaña "Conversaciones"). La
 // usan tanto el auxiliar (una instancia por pestaña, con `comboFiltro` fijo)
 // como médico/clínica (una sola instancia, sin `comboFiltro`).
-function OfertaSeccion({ perfil, comboFiltro, oferta, loading, conversaciones, onOfertaChange, onPerfilChange, showToast }) {
+function OfertaSeccion({ perfil, comboFiltro, oferta, plantilla, loading, conversaciones, onOfertaChange, onPerfilChange, showToast }) {
   const [editando, setEditando] = useState(false);
   const [toggling, setToggling] = useState(false);
+  // "Volver a publicar": cuando esta pestaña no tiene oferta vigente pero sí
+  // una terminal (finalizada/cancelada), el formulario arranca pre-rellenado
+  // con ella. `ignorarPlantilla` es el botón "Limpiar" — vuelve a un formulario
+  // en blanco sin recargar la lista.
+  const [ignorarPlantilla, setIgnorarPlantilla] = useState(false);
+  const plantillaActiva = !oferta && !editando && plantilla && !ignorarPlantilla ? plantilla : null;
   // 'cancelar' | 'finalizar' | null — qué confirmación está abierta (0018:
   // ambas son terminales, así que se pide confirmación explícita antes de
   // llamar a la capa de acceso a datos).
@@ -622,11 +637,14 @@ function OfertaSeccion({ perfil, comboFiltro, oferta, loading, conversaciones, o
 
       {!loading && (!oferta || editando) && (
         <OfertaForm
+          key={editando ? `edit-${oferta.id}` : plantillaActiva ? `plantilla-${plantillaActiva.id}` : 'nueva'}
           perfil={perfil}
           initial={editando ? oferta : null}
+          plantilla={plantillaActiva}
           comboFiltro={comboFiltro}
           onPerfilChange={onPerfilChange}
           onCancel={() => setEditando(false)}
+          onLimpiarPlantilla={() => setIgnorarPlantilla(true)}
           onSaved={async () => {
             setEditando(false);
             await onOfertaChange();
@@ -835,6 +853,13 @@ export default function TabMiOferta({ perfil }) {
     ? misPublicaciones.filter((p) => p.tipo === activa.tipo && p.rol_objetivo === activa.rolObjetivo)
     : [];
   const oferta = publicacionesTab.find((p) => !p.estado || p.estado === 'abierta') ?? null;
+  // Si no hay oferta vigente, la última terminal sirve de plantilla para
+  // "volver a publicar" sin rellenar todo de nuevo. `publicacionesTab` ya viene
+  // ordenada por `created_at` desc (fetchMisPublicaciones), así que la primera
+  // finalizada/cancelada es la más reciente.
+  const plantilla = oferta
+    ? null
+    : publicacionesTab.find((p) => p.estado === 'finalizada' || p.estado === 'cancelada') ?? null;
   // Cada pestaña es exclusiva: solo cuentan las conversaciones de la
   // publicación de esa pestaña, nunca las de la otra audiencia. Esto es lo que
   // permite tener las dos ofertas del rol activas a la vez, cada una con su
@@ -864,6 +889,7 @@ export default function TabMiOferta({ perfil }) {
           perfil={perfil}
           comboFiltro={{ tipo: activa.tipo, rolObjetivo: activa.rolObjetivo }}
           oferta={oferta}
+          plantilla={plantilla}
           loading={loading}
           conversaciones={conversacionesTab}
           onOfertaChange={cargarMiOferta}

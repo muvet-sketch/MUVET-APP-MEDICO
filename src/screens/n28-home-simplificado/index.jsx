@@ -7,12 +7,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
-import { signOut } from '../../lib/auth';
 import { fetchMisPublicaciones, fetchMisConversaciones } from '../../lib/relevo';
 import { CORTO_TURNOS, NOMBRE_TURNOS } from '../../lib/nombresModulos';
-import { Card, Button, BottomNav, NotificationBell } from '../../components/ui';
+import { Card, Button, BottomNav, NotificationBell, AppMenu } from '../../components/ui';
 import OfertasRecientes from '../../components/home/OfertasRecientes';
 import HistorialReciente from '../../components/home/HistorialReciente';
+import ServiciosAceptados from '../../components/home/ServiciosAceptados';
 import PerfilAuxiliarInline from './PerfilAuxiliarInline';
 import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
 
@@ -61,11 +61,10 @@ export default function N28HomeSimplificado() {
           <p className="text-[12px] text-[#5A6B7A]">Hola,</p>
           <h1 className="text-[18px] font-semibold text-[#0A1628]">{nombreMostrado}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        {/* 0028: "Salir" y "Mi perfil" viven ahora en el menú hamburguesa. */}
+        <div className="flex items-center gap-1">
           <NotificationBell perfilId={perfil.id} />
-          <button type="button" onClick={signOut} className="text-[12px] text-[#5A6B7A] underline underline-offset-2">
-            Salir
-          </button>
+          <AppMenu />
         </div>
       </div>
 
@@ -82,6 +81,11 @@ export default function N28HomeSimplificado() {
           {`Ir a ${CORTO_TURNOS}`}
         </Button>
       </Card>
+
+      {/* Lo acordado que sigue en curso: con quién, dónde, y la puerta al
+          chat (0028). El auxiliar ve Turnos + Auxiliar; la clínica solo
+          Turnos, que es el único módulo en el que participa. */}
+      <ServiciosAceptados perfil={perfil} />
 
       <OfertasRecientes perfil={perfil} />
 

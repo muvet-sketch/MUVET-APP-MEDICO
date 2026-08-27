@@ -1,85 +1,71 @@
-// N-26 · MUVET Turnos — hilo de negociación 1:1.
+// N-32 · MUVET Auxiliar — negociación 1:1 médico↔auxiliar.
 //
-// OJO: el identificador interno de este módulo sigue siendo `relevo` (ruta
-// /relevo, lib/relevo.js, tablas relevo_*) pero de cara al usuario se llama
-// "MUVET Turnos"; "MUVET Relevo" es ahora el módulo médico↔médico de N-30.
-// Ver el bloque de lib/nombresModulos.js.
+// Reúne las tres cosas que el fundador pidió y que ningún módulo tenía juntas:
 //
-// MODIFICACIÓN A D-540 confirmada con el fundador (ver migración 0027): este
-// módulo deja de ser "un mensaje único de contacto" y pasa a tener un hilo
-// privado entre las DOS partes de una postulación.
+//   1. Chat EN TIEMPO REAL (sin refrescar) — subscribeMensajesApoyo.
+//   2. El chat sigue ABIERTO tras el acuerdo y se cierra al FINALIZAR el
+//      servicio, no al aceptarlo. Lo impone la policy de insert de 0028
+//      (`estado in ('abierta','aceptada')`), no esta pantalla.
+//   3. Al haber acuerdo mutuo se comparte la DIRECCIÓN DE ENCUENTRO. También
+//      es backend: la policy de select de `apoyo_direccion` no le devuelve
+//      nada al auxiliar antes del acuerdo (D-064).
 //
-// El relevo se cierra con el acuerdo de AMBAS partes: cada una pulsa "Estoy de
-// acuerdo" y el trigger deriva `estado` de las dos banderas. Es el espíritu de
-// la confirmación doble de 0016 —que 0020 había quitado por fricción— pero
-// ahora sí tiene contenido que ratificar.
-//
-// SEGUNDA MODIFICACIÓN A D-540 (migración 0028). 0027 dejó anotado el supuesto
-// de que cerrar el hilo al aceptar deja a las partes sin canal justo cuando
-// empiezan a coordinar, y lo compensaba revelando el teléfono. El fundador lo
-// resolvió al revés — el canal se queda y el teléfono se va:
-//
-//   · El hilo SIGUE ABIERTO en estado 'aceptada' y se cierra con el nuevo
-//     estado terminal 'finalizada'. No es una condición de esta pantalla: la
-//     policy de insert de 0028 exige `estado in ('abierta','aceptada')`.
-//   · Es EN TIEMPO REAL: ya no hay que refrescar para ver mensajes nuevos ni
-//     el acuerdo de la otra parte.
-//   · NO se muestra ningún teléfono. `relevo_ficha_contacto` dejó de
-//     devolverlo; de la clínica sigue revelándose la dirección de sede tras el
-//     acuerdo (D-064).
-//
-// Sin adjuntos, a diferencia de ChatCobertura (0023) y de ConversacionApoyo
-// (0028), de donde sí se toma la estructura visual (burbujas + composer).
-import { useEffect, useRef, useState } from 'react';
+// Y una que se pidió por omisión: aquí NO se muestra ningún teléfono. Toda la
+// comunicación se canaliza por este chat, que por eso tiene que sobrevivir al
+// acuerdo.
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { ScreenHeader, Card, Badge, Button, Modal, Toast } from '../../components/ui';
-import { formatCOP, formatFechaCorta } from '../../lib/format';
+import BurbujasMensajes from '../../components/chat/BurbujasMensajes';
+import DireccionEncuentro from './DireccionEncuentro';
+import { validateResultFile } from '../../lib/fileValidation';
+import { formatCOP } from '../../lib/format';
 import {
-  fetchConversacion,
-  fetchMensajesConversacion,
-  enviarMensajeConversacion,
-  acordarConversacion,
-  descartarConversacion,
-  finalizarConversacionServicio,
-  marcarConversacionLeida,
-  fetchFichaContacto,
-  subscribeMensajesConversacion,
-  subscribeConversacion,
+  fetchConversacionApoyo,
+  fetchMensajesApoyo,
+  fetchDireccionEncuentro,
+  fetchFichaContactoApoyo,
+  enviarMensajeApoyo,
+  acordarConversacionApoyo,
+  descartarConversacionApoyo,
+  finalizarServicioApoyo,
+  marcarConversacionApoyoLeida,
+  subscribeMensajesApoyo,
+  subscribeConversacionApoyo,
+  getSignedApoyoChatFileUrl,
   esParteAutora,
-  formatFranjaHoraria,
-} from '../../lib/relevo';
-import FichaContacto from './FichaContacto';
-
-const ACTOR_LABEL = { clinica: '🏥 Clínica', auxiliar: '🧰 Auxiliar', medico: '🩺 Médico' };
+  chatAbierto,
+  labelSubtipo,
+  formatFechaApoyo,
+  formatFranjaApoyo,
+} from '../../lib/apoyo';
 
 const ESTADO_BADGE = {
   abierta: { label: 'En conversación', tone: 'info' },
-  aceptada: { label: 'Turno confirmado', tone: 'ok' },
+  aceptada: { label: 'Servicio confirmado', tone: 'ok' },
   finalizada: { label: 'Servicio finalizado', tone: 'neutral' },
   descartada: { label: 'Descartada', tone: 'critical' },
 };
 
-export default function ConversacionRelevo() {
+export default function ConversacionApoyo() {
   const { conversacionId } = useParams();
   const { perfil } = useAuth();
   const navigate = useNavigate();
 
   const [conversacion, setConversacion] = useState(null);
   const [mensajes, setMensajes] = useState([]);
+  const [direccion, setDireccion] = useState(null);
   const [ficha, setFicha] = useState(null);
-  const [cargandoFicha, setCargandoFicha] = useState(false);
   const [loading, setLoading] = useState(true);
   const [texto, setTexto] = useState('');
+  const [archivo, setArchivo] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [acordando, setAcordando] = useState(false);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
-  const [descartando, setDescartando] = useState(false);
   const [confirmandoFinal, setConfirmandoFinal] = useState(false);
-  const [finalizando, setFinalizando] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState({ message: '', tone: 'ok', visible: false });
-  const bottomRef = useRef(null);
 
   function showToast(message, tone = 'ok') {
     setToast({ message, tone, visible: true });
@@ -90,7 +76,10 @@ export default function ConversacionRelevo() {
     if (!perfil?.id) return undefined;
     let activo = true;
     setLoading(true);
-    Promise.all([fetchConversacion(conversacionId, perfil.id), fetchMensajesConversacion(conversacionId)])
+    Promise.all([
+      fetchConversacionApoyo(conversacionId, perfil.id),
+      fetchMensajesApoyo(conversacionId),
+    ])
       .then(([c, m]) => {
         if (!activo) return;
         setConversacion(c);
@@ -107,70 +96,87 @@ export default function ConversacionRelevo() {
     };
   }, [conversacionId, perfil?.id]);
 
-  // Realtime del hilo (0028). Se deduplica por id porque el emisor también
-  // recibe su propio INSERT.
+  // Mensajes en vivo. Se deduplica por id porque el emisor también recibe su
+  // propio INSERT — por eso handleEnviar no hace append optimista.
   useEffect(() => {
-    return subscribeMensajesConversacion(conversacionId, (nuevo) => {
+    return subscribeMensajesApoyo(conversacionId, (nuevo) => {
       setMensajes((prev) => (prev.some((m) => m.id === nuevo.id) ? prev : [...prev, nuevo]));
     });
   }, [conversacionId]);
 
-  // La fila de la conversación en vivo: el acuerdo o la finalización de la otra
-  // parte se ven sin recargar.
+  // La fila de la conversación en vivo: así cada parte ve el acuerdo o la
+  // finalización de la otra sin recargar.
   useEffect(() => {
-    return subscribeConversacion(conversacionId, (nueva) => {
+    return subscribeConversacionApoyo(conversacionId, (nueva) => {
       setConversacion((prev) => (prev ? { ...prev, ...nueva } : prev));
     });
   }, [conversacionId]);
 
-  // Al abrir se da por vista: apaga el punto rojo de la bandeja. La campana es
-  // otra cosa (tabla `notificaciones`, 0026) y se apaga en /notificaciones.
   useEffect(() => {
     if (!conversacion || !perfil?.id) return;
-    marcarConversacionLeida(conversacion, perfil.id).catch(() => {});
+    marcarConversacionApoyoLeida(conversacion, perfil.id).catch(() => {});
   }, [conversacion?.id, perfil?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // La ficha ampliada depende del estado: los datos profesionales llegan desde
-  // que hay conversación, y la dirección de sede de la clínica solo cuando el
-  // turno está confirmado. Por eso se vuelve a pedir cuando cambia `estado`.
-  // (El teléfono ya no viaja en ninguno de los dos niveles desde 0028.)
+  // La dirección se vuelve a pedir cuando cambia el estado: es exactamente el
+  // momento en que el backend empieza (o deja) de devolvérsela al auxiliar.
+  useEffect(() => {
+    if (!conversacion?.id) return undefined;
+    let activo = true;
+    fetchDireccionEncuentro(conversacion.id)
+      .then((d) => {
+        if (activo) setDireccion(d);
+      })
+      .catch(() => {
+        if (activo) setDireccion(null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [conversacion?.id, conversacion?.estado]);
+
   useEffect(() => {
     const otroId = conversacion?.otro?.id;
     if (!otroId) return undefined;
     let activo = true;
-    setCargandoFicha(true);
-    fetchFichaContacto(otroId)
+    fetchFichaContactoApoyo(otroId)
       .then((f) => {
         if (activo) setFicha(f);
       })
       .catch(() => {
         if (activo) setFicha(null);
-      })
-      .finally(() => {
-        if (activo) setCargandoFicha(false);
       });
     return () => {
       activo = false;
     };
-  }, [conversacion?.otro?.id, conversacion?.estado]);
+  }, [conversacion?.otro?.id]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [mensajes.length]);
+  function handleFileChange(e) {
+    const file = e.target.files?.[0] ?? null;
+    setError('');
+    if (!file) return;
+    const { ok, error: validationError } = validateResultFile(file);
+    if (!ok) {
+      setError(validationError);
+      e.target.value = '';
+      return;
+    }
+    setArchivo(file);
+  }
 
   async function handleEnviar(e) {
     e.preventDefault();
-    if (!texto.trim()) return;
+    if (!texto.trim() && !archivo) return;
     setEnviando(true);
     setError('');
     try {
-      const nuevo = await enviarMensajeConversacion({
+      await enviarMensajeApoyo({
         conversacionId,
         remitenteId: perfil.id,
-        mensaje: texto,
+        mensaje: texto.trim() || null,
+        archivo,
       });
-      setMensajes((prev) => [...prev, nuevo]);
       setTexto('');
+      setArchivo(null);
     } catch (err) {
       setError(err.message ?? 'No se pudo enviar el mensaje.');
     } finally {
@@ -181,11 +187,11 @@ export default function ConversacionRelevo() {
   async function handleAcordar() {
     setAcordando(true);
     try {
-      const actualizada = await acordarConversacion(conversacion, perfil.id);
+      const actualizada = await acordarConversacionApoyo(conversacion, perfil.id);
       setConversacion((prev) => ({ ...prev, ...actualizada }));
       showToast(
         actualizada.estado === 'aceptada'
-          ? '¡Turno confirmado! Sigan coordinando por este chat.'
+          ? '¡Servicio confirmado! Ya pueden ver el punto de encuentro.'
           : 'Registramos tu acuerdo. Falta la confirmación de la otra parte.',
         'ok',
       );
@@ -197,40 +203,36 @@ export default function ConversacionRelevo() {
   }
 
   async function handleDescartar() {
-    setDescartando(true);
     try {
-      const actualizada = await descartarConversacion(conversacionId);
+      const actualizada = await descartarConversacionApoyo(conversacionId);
       setConversacion((prev) => ({ ...prev, ...actualizada }));
       setConfirmandoDescarte(false);
       showToast('Conversación descartada.', 'ok');
     } catch (err) {
-      showToast(err.message ?? 'No se pudo descartar la conversación.', 'critical');
-    } finally {
-      setDescartando(false);
+      showToast(err.message ?? 'No se pudo descartar.', 'critical');
     }
   }
 
   async function handleFinalizar() {
-    setFinalizando(true);
     try {
-      await finalizarConversacionServicio(conversacionId);
-      const actualizada = await fetchConversacion(conversacionId, perfil.id);
+      await finalizarServicioApoyo(conversacionId);
+      const actualizada = await fetchConversacionApoyo(conversacionId, perfil.id);
       setConversacion(actualizada);
       setConfirmandoFinal(false);
-      showToast('Turno finalizado. El historial del chat queda guardado.', 'ok');
+      showToast('Servicio finalizado. El historial del chat queda guardado.', 'ok');
     } catch (err) {
-      showToast(err.message ?? 'No se pudo finalizar el turno.', 'critical');
-    } finally {
-      setFinalizando(false);
+      showToast(err.message ?? 'No se pudo finalizar el servicio.', 'critical');
     }
   }
+
+  const resolverUrlAdjunto = useCallback((path) => getSignedApoyoChatFileUrl(path), []);
 
   if (!perfil) return null;
 
   if (loading) {
     return (
       <div className="flex min-h-svh flex-col">
-        <ScreenHeader title="Conversación" fallbackTo="/relevo?tab=mensajes" />
+        <ScreenHeader title="Conversación" fallbackTo="/apoyo?tab=conversaciones" />
         <p className="px-5 py-5 text-[12px] text-[#5A6B7A]">Cargando…</p>
       </div>
     );
@@ -239,12 +241,12 @@ export default function ConversacionRelevo() {
   if (!conversacion) {
     return (
       <div className="flex min-h-svh flex-col">
-        <ScreenHeader title="Conversación" fallbackTo="/relevo?tab=mensajes" />
+        <ScreenHeader title="Conversación" fallbackTo="/apoyo?tab=conversaciones" />
         <div className="px-5 py-5">
-          <Card className="text-center text-[12px] text-[#5A6B7A]">
+          <Card className="text-center text-[13px] text-[#5A6B7A]">
             Esta conversación no existe o ya no tienes acceso a ella.
           </Card>
-          <Button className="mt-3" onClick={() => navigate('/relevo?tab=mensajes')}>
+          <Button className="mt-3" onClick={() => navigate('/apoyo?tab=conversaciones')}>
             Volver a mis conversaciones
           </Button>
         </div>
@@ -253,93 +255,116 @@ export default function ConversacionRelevo() {
   }
 
   const soyAutora = esParteAutora(conversacion, perfil.id);
-  const nombreOtro = conversacion.otro?.razon_social || conversacion.otro?.nombre_completo || 'Usuario MUVET';
+  const nombreOtro = conversacion.otro?.nombre_completo || conversacion.otro?.razon_social || 'Usuario MUVET';
   const abierta = conversacion.estado === 'abierta';
   const aceptada = conversacion.estado === 'aceptada';
-  // 0028: el hilo vive mientras dura el servicio, no solo la negociación.
-  const puedeEscribir = abierta || aceptada;
+  const puedeEscribir = chatAbierto(conversacion);
   const miAcuerdo = soyAutora ? conversacion.acuerdo_autor : conversacion.acuerdo_interesado;
   const suAcuerdo = soyAutora ? conversacion.acuerdo_interesado : conversacion.acuerdo_autor;
-  const estadoBadge = ESTADO_BADGE[conversacion.estado] ?? ESTADO_BADGE.abierta;
+  const badge = ESTADO_BADGE[conversacion.estado] ?? ESTADO_BADGE.abierta;
   const publicacion = conversacion.publicacion;
-  const franja = formatFranjaHoraria(publicacion);
+  const soyElMedico = perfil.rol === 'medico';
+  const fecha = formatFechaApoyo(publicacion);
+  const franja = formatFranjaApoyo(publicacion);
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title={nombreOtro} fallbackTo="/relevo?tab=mensajes" conCampana />
+      <ScreenHeader title={nombreOtro} fallbackTo="/apoyo?tab=conversaciones" conCampana />
 
       <div className="flex flex-col gap-3 px-5 py-4">
         <Card className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[14px] font-semibold text-[#0A1628]">{nombreOtro}</p>
-            <Badge tone={estadoBadge.tone}>{estadoBadge.label}</Badge>
+            <Badge tone={badge.tone}>{badge.label}</Badge>
           </div>
-          <p className="text-[11px] text-[#5A6B7A]">{ACTOR_LABEL[conversacion.otro?.rol] ?? ''}</p>
-          <p className="text-[13px] text-[#0A1628]">Sobre: {publicacion?.descripcion || '(sin descripción)'}</p>
+          <p className="text-[12px] text-[#5A6B7A]">
+            {conversacion.otro?.rol === 'medico' ? '🩺 Médico' : '🧰 Auxiliar'}
+            {ficha?.especialidad ? ` · ${ficha.especialidad}` : ''}
+          </p>
+          {ficha?.matricula_comvezcol && (
+            <p className="text-[11px] text-[#5A6B7A]">
+              Matrícula COMVEZCOL {ficha.matricula_comvezcol}
+              {ficha.estado_validacion === 'validado' ? ' · ✅ validada' : ''}
+            </p>
+          )}
+          <p className="text-[13px] font-medium text-[#0A1628]">
+            {labelSubtipo(conversacion.servicio_subtipo)}
+          </p>
+          <p className="text-[13px] text-[#0A1628]">{publicacion?.descripcion || '(sin descripción)'}</p>
           <p className="text-[12px] text-[#5A6B7A]">
             {publicacion?.zona ? `📍 ${publicacion.zona}` : ''}
-            {publicacion?.tipo_jornada ? ` · ${publicacion.tipo_jornada}` : ''}
+            {fecha ? ` · ${fecha}` : ''}
             {franja ? ` · ${franja}` : ''}
           </p>
           {publicacion?.tarifa != null && (
             <p className="text-[13px] font-semibold text-[#1A7A5E]">{formatCOP(publicacion.tarifa)}</p>
           )}
-          <FichaContacto ficha={ficha} cargando={cargandoFicha} />
         </Card>
-      </div>
 
-      <div className="flex-1 overflow-y-auto px-5">
-        {mensajes.length === 0 && (
-          <p className="py-8 text-center text-[13px] text-[#5A6B7A]">Todavía no hay mensajes.</p>
+        {/* El punto de encuentro. Antes del acuerdo el auxiliar recibe null
+            desde el backend; el médico ve y edita su borrador. */}
+        {(aceptada || conversacion.estado === 'finalizada' || soyElMedico) && (
+          <DireccionEncuentro
+            conversacionId={conversacion.id}
+            direccion={direccion}
+            soyElMedico={soyElMedico}
+            editable={puedeEscribir}
+            onGuardada={setDireccion}
+            showToast={showToast}
+          />
         )}
-        <div className="flex flex-col gap-2 pb-4">
-          {mensajes.map((m) => {
-            const esMio = m.remitente_id === perfil.id;
-            return (
-              <div key={m.id} className={`flex flex-col ${esMio ? 'items-end' : 'items-start'}`}>
-                <div
-                  className={`max-w-[80%] rounded-[12px] px-3 py-2 ${
-                    esMio ? 'bg-[#0A1628] text-white' : 'bg-[#F4F7F9] text-[#0A1628]'
-                  }`}
-                >
-                  <p className="text-[13px]">{m.mensaje}</p>
-                </div>
-                <p className="mt-0.5 text-[11px] text-[#5A6B7A]">{formatFechaCorta(m.created_at)}</p>
-              </div>
-            );
-          })}
-          <div ref={bottomRef} />
-        </div>
       </div>
 
-      {/* Barra de acuerdo: es donde vive "si ambas partes están de acuerdo se
-          acepta la oferta". El estado lo deriva el trigger de 0027 de las dos
-          banderas — acá solo se marca la propia. */}
+      <BurbujasMensajes
+        mensajes={mensajes}
+        perfilId={perfil.id}
+        resolverUrlAdjunto={resolverUrlAdjunto}
+        vacio="Todavía no hay mensajes. Coordina el servicio acá."
+      />
+
       {puedeEscribir && (
         <div className="sticky bottom-0 flex flex-col gap-2 border-t border-[#E1E8ED] bg-white px-5 py-3">
           {abierta && (
             <p className="text-[11px] text-[#5A6B7A]">
               Tú: <span className="font-medium text-[#0A1628]">{miAcuerdo ? '✓ de acuerdo' : 'sin confirmar'}</span> ·{' '}
-              {nombreOtro}: <span className="font-medium text-[#0A1628]">{suAcuerdo ? '✓ de acuerdo' : 'sin confirmar'}</span>
+              {nombreOtro}:{' '}
+              <span className="font-medium text-[#0A1628]">{suAcuerdo ? '✓ de acuerdo' : 'sin confirmar'}</span>
             </p>
           )}
 
           {aceptada && (
             <p className="text-[12px] font-medium text-[#1A7A5E]">
-              ✓ Turno confirmado por ambas partes. Sigan coordinando por acá hasta finalizarlo.
+              ✓ Servicio confirmado. Sigan coordinando por acá hasta finalizarlo.
             </p>
           )}
 
+          {archivo && (
+            <p className="text-[12px] text-[#5A6B7A]">
+              📎 {archivo.name}{' '}
+              <button type="button" onClick={() => setArchivo(null)} className="text-[#C63B3B] underline">
+                quitar
+              </button>
+            </p>
+          )}
           {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}
 
           <form onSubmit={handleEnviar} className="flex items-center gap-2">
+            <label className="cursor-pointer text-[20px]">
+              📎
+              <input
+                type="file"
+                accept="image/png,image/jpeg,application/pdf"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
             <input
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               placeholder="Escribe un mensaje…"
               className="flex-1 rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2.5 text-[14px] text-[#0A1628] outline-none focus:border-[#1A7A5E]"
             />
-            <Button type="submit" fullWidth={false} disabled={enviando || !texto.trim()}>
+            <Button type="submit" fullWidth={false} disabled={enviando || (!texto.trim() && !archivo)}>
               Enviar
             </Button>
           </form>
@@ -367,8 +392,8 @@ export default function ConversacionRelevo() {
           )}
 
           {aceptada && (
-            <Button variant="danger" disabled={finalizando} onClick={() => setConfirmandoFinal(true)}>
-              {finalizando ? 'Finalizando…' : 'Finalizar turno'}
+            <Button variant="danger" onClick={() => setConfirmandoFinal(true)}>
+              Finalizar servicio
             </Button>
           )}
         </div>
@@ -376,7 +401,7 @@ export default function ConversacionRelevo() {
 
       {conversacion.estado === 'finalizada' && (
         <div className="sticky bottom-0 border-t border-[#E1E8ED] bg-white px-5 py-3">
-          <p className="text-[13px] font-medium text-[#0A1628]">🏁 Turno finalizado.</p>
+          <p className="text-[13px] font-medium text-[#0A1628]">🏁 Servicio finalizado.</p>
           <p className="mt-1 text-[11px] text-[#5A6B7A]">
             El chat quedó cerrado a mensajes nuevos, pero el historial se conserva acá.
           </p>
@@ -390,18 +415,17 @@ export default function ConversacionRelevo() {
               ? 'Descartaste esta conversación.'
               : `${nombreOtro} descartó esta conversación.`}
           </p>
-          <p className="mt-1 text-[11px] text-[#5A6B7A]">No admite mensajes nuevos. Puedes buscar otras ofertas.</p>
+          <p className="mt-1 text-[11px] text-[#5A6B7A]">No admite mensajes nuevos.</p>
         </div>
       )}
 
       <Modal open={confirmandoDescarte} onClose={() => setConfirmandoDescarte(false)} title="Descartar conversación">
         <div className="flex flex-col gap-3">
           <p className="text-[13px] text-[#0A1628]">
-            Esta acción es permanente: la conversación se cierra para las dos partes y no se puede reabrir. Si quieres
-            retomar el contacto tendrás que esperar a una oferta nueva.
+            Se cierra para las dos partes y no se puede reabrir.
           </p>
-          <Button variant="danger" disabled={descartando} onClick={handleDescartar}>
-            {descartando ? 'Descartando…' : 'Sí, descartar'}
+          <Button variant="danger" onClick={handleDescartar}>
+            Sí, descartar
           </Button>
           <Button variant="ghost" onClick={() => setConfirmandoDescarte(false)}>
             Volver
@@ -409,14 +433,14 @@ export default function ConversacionRelevo() {
         </div>
       </Modal>
 
-      <Modal open={confirmandoFinal} onClose={() => setConfirmandoFinal(false)} title="Finalizar turno">
+      <Modal open={confirmandoFinal} onClose={() => setConfirmandoFinal(false)} title="Finalizar servicio">
         <div className="flex flex-col gap-3">
           <p className="text-[13px] text-[#0A1628]">
-            Da el turno por cumplido. El chat se cierra a mensajes nuevos, pero el historial queda
+            Da el servicio por cumplido. El chat se cierra a mensajes nuevos, pero el historial queda
             guardado y podrás consultarlo desde tu historial.
           </p>
-          <Button variant="danger" disabled={finalizando} onClick={handleFinalizar}>
-            {finalizando ? 'Finalizando…' : 'Sí, finalizar'}
+          <Button variant="danger" onClick={handleFinalizar}>
+            Sí, finalizar
           </Button>
           <Button variant="ghost" onClick={() => setConfirmandoFinal(false)}>
             Volver

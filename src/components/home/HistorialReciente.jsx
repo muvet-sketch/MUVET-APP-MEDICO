@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Badge } from '../ui';
 import { formatFechaCorta, truncarTexto } from '../../lib/format';
 import { fetchHistorialUnificado } from '../../lib/historialUnificado';
-import { ICONO_RELEVO, ICONO_TURNOS } from '../../lib/nombresModulos';
+import { ICONO_AUXILIAR, ICONO_RELEVO, ICONO_TURNOS } from '../../lib/nombresModulos';
 
 // Vista previa del historial único (N-9) en el Home de los tres roles: los
 // últimos eventos terminados, con el detalle completo a un clic de distancia.
@@ -19,14 +19,15 @@ const ORIGEN_ICONO = {
   cobertura: ICONO_RELEVO,
   relevo_oferta: ICONO_TURNOS,
   relevo_conversacion: ICONO_TURNOS,
+  apoyo_conversacion: ICONO_AUXILIAR,
 };
 
 // Mismos estados terminales que pinta ItemHistorial, resumidos a una etiqueta
-// corta que quepa junto al título en 390px.
+// corta que quepa junto al título en 390px. Desde 0028 'aceptada' ya no llega
+// acá: un acuerdo sigue en curso y vive en "Servicios aceptados".
 const ESTADO_BADGE = {
   finalizada: { label: 'Finalizada', tone: 'ok' },
   cancelada: { label: 'Cancelada', tone: 'critical' },
-  aceptada: { label: 'Acuerdo', tone: 'ok' },
   descartada: { label: 'Descartada', tone: 'critical' },
 };
 

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { subscribeInserts, subscribeRow } from './chatRealtime';
 
 // N-26 · MUVET Turnos (D-540/D-545/D-546). Capa de acceso a datos, siguiendo
 // el patrón de lib/solicitudes.js y lib/coberturaServicio.js.
@@ -14,6 +15,17 @@ import { supabase } from './supabase';
 // privado mientras dura la negociación, y el turno se cierra solo cuando
 // AMBAS partes marcan su acuerdo — `estado` lo deriva un trigger, nunca el
 // cliente.
+//
+// 0028 vuelve a modificar D-540, resolviendo el SUPUESTO que 0027 dejó abierto
+// ("el hilo se cierra al aceptar, lo que deja a las partes sin canal justo
+// cuando empiezan a coordinar; lo compensa revelar el teléfono"). El fundador
+// lo resolvió al revés — el canal se queda y el teléfono se va:
+//   · El hilo sigue admitiendo mensajes en estado 'aceptada' y se cierra con
+//     el nuevo estado terminal 'finalizada' (relevo_finalizar_servicio).
+//   · Es EN TIEMPO REAL: `relevo_mensajes` estaba en la publicación
+//     supabase_realtime desde 0013 "sin consumidor"; ahora lo tiene.
+//   · `relevo_ficha_contacto` ya no devuelve `telefono`. Ningún número de
+//     teléfono se muestra en la app: todo se canaliza por el chat.
 //
 // El filtrado de qué publicación ve cada actor sigue siendo responsabilidad de
 // esta capa y de las pantallas, pero ya no es la única defensa: 0027 exige en
@@ -37,15 +49,15 @@ import { supabase } from './supabase';
 // vista de listado (pestaña Ofertas), no un tipo de publicación nuevo.
 // Confirmar con el fundador si en el futuro una clínica necesita publicar
 // tipo='ofrezco'.
+//
+// 0028: el matching médico↔auxiliar SALIÓ de este módulo. Las combinaciones
+// {busco, auxiliar} de `medico` y {ofrezco, medico} de `auxiliar` se retiraron
+// y viven ahora en MUVET Auxiliar (lib/apoyo.js, ruta /apoyo), que sí puede
+// expresar lo que las distinguía: si el auxiliar acompaña al médico o si va
+// solo a un domicilio. Lo que queda acá siempre involucra a una clínica.
 export const PUBLICACIONES_PERMITIDAS_POR_ROL = {
-  medico: [
-    { tipo: 'ofrezco', rolObjetivo: 'clinica' },
-    { tipo: 'busco', rolObjetivo: 'auxiliar' },
-  ],
-  auxiliar: [
-    { tipo: 'ofrezco', rolObjetivo: 'clinica' },
-    { tipo: 'ofrezco', rolObjetivo: 'medico' },
-  ],
+  medico: [{ tipo: 'ofrezco', rolObjetivo: 'clinica' }],
+  auxiliar: [{ tipo: 'ofrezco', rolObjetivo: 'clinica' }],
   clinica: [
     { tipo: 'busco', rolObjetivo: 'medico' },
     { tipo: 'busco', rolObjetivo: 'auxiliar' },
@@ -412,8 +424,12 @@ export function formatFranjaHoraria(publicacion) {
   return `${inicio}${fin ? `–${fin}` : ''}${duracion ? ` (${duracion})` : ''}`;
 }
 
+// Cuenta 'finalizada' además de 'aceptada' (0028): un turno que ya se prestó
+// siguió consumiendo su cupo. Si no, al finalizar el servicio la oferta se
+// republicaría sola y finalizarPublicacion diría que no hay ninguno confirmado.
+// El backend cuenta igual (relevo_cerrar_publicacion_por_cupos, 0028).
 export function contarRelevosConfirmados(conversaciones) {
-  return (conversaciones ?? []).filter((c) => c.estado === 'aceptada').length;
+  return (conversaciones ?? []).filter((c) => ['aceptada', 'finalizada'].includes(c.estado)).length;
 }
 
 export async function fetchCuposPublicacion(publicacionId) {
@@ -522,9 +538,10 @@ export async function fetchMensajesConversacion(conversacionId) {
   return data ?? [];
 }
 
-// La policy de insert de 0027 exige que la conversación siga 'abierta': al
-// aceptarse o descartarse el hilo deja de admitir mensajes en backend, no solo
-// porque la UI esconda el composer.
+// La policy de insert de 0028 exige que la conversación esté 'abierta' o
+// 'aceptada': el hilo sigue vivo mientras dura el servicio y solo deja de
+// admitir mensajes al finalizarlo o descartarlo. Es backend, no una condición
+// de la UI. (En 0027 se cerraba ya al aceptar — ver la cabecera.)
 export async function enviarMensajeConversacion({ conversacionId, remitenteId, mensaje }) {
   const texto = (mensaje ?? '').trim();
   if (!texto) throw new Error('El mensaje no puede estar vacío.');
@@ -551,6 +568,30 @@ export async function acordarConversacion(conversacion, perfilId) {
     .single();
   if (error) throw error;
   return data;
+}
+
+// Cierra el turno ya prestado (0028). Vía RPC porque el trigger impide que el
+// cliente saque la conversación de 'aceptada' con un update suelto. A
+// diferencia de Cobertura, NO se borra ningún mensaje: el historial queda.
+export async function finalizarConversacionServicio(conversacionId) {
+  const { error } = await supabase.rpc('relevo_finalizar_servicio', {
+    p_conversacion_id: conversacionId,
+  });
+  if (error) throw error;
+}
+
+// Realtime del hilo (0028). `relevo_mensajes` está en la publicación
+// supabase_realtime desde 0013 y `relevo_conversaciones` desde 0027, pero
+// hasta ahora no había consumidor: por eso había que refrescar para ver
+// mensajes nuevos.
+export function subscribeMensajesConversacion(conversacionId, onNuevoMensaje) {
+  return subscribeInserts('relevo_mensajes', 'conversacion_id', conversacionId, onNuevoMensaje);
+}
+
+// La fila de la conversación: deja ver en vivo el acuerdo o la finalización de
+// la otra parte sin recargar.
+export function subscribeConversacion(conversacionId, onCambio) {
+  return subscribeRow('relevo_conversaciones', conversacionId, onCambio);
 }
 
 // Terminal, y la puede tomar cualquiera de los dos. No consume cupo.
@@ -589,14 +630,19 @@ export function tieneNoLeidos(conversacion, perfilId) {
   return new Date(conversacion.ultimo_mensaje_at) > new Date(visto);
 }
 
-// Ficha de contacto ampliada (0022, reescrita en 0027): matrícula COMVEZCOL y
-// su estado de validación, especialidad, zona, bio y NIT en cuanto hay una
-// conversación — lo que hace falta para saber con quién estás hablando y que
-// `perfiles_publico` (0014) deliberadamente no expone a cualquier autenticado.
-// `telefono` y `direccion_sede` llegan en null hasta que la conversación queda
-// 'aceptada': el dato de contacto directo se revela después del compromiso,
-// mismo criterio que D-064. Si no hay ninguna relación, devuelve null y la UI
-// cae de vuelta a los datos básicos (nombre, rol) que ya trae `otro`.
+// Ficha de contacto ampliada (0022, reescrita en 0027 y en 0028): matrícula
+// COMVEZCOL y su estado de validación, especialidad, zona, bio y NIT en cuanto
+// hay una conversación — lo que hace falta para saber con quién estás hablando
+// y que `perfiles_publico` (0014) deliberadamente no expone a cualquier
+// autenticado.
+//
+// 0028 QUITÓ `telefono` de la función: ya no se devuelve en ningún estado.
+// Toda la comunicación va por el chat, que ahora sobrevive al acuerdo. Lo que
+// sigue revelándose tras el acuerdo (o la finalización) es `direccion_sede`,
+// la ubicación del establecimiento de la clínica — mismo criterio que D-064.
+//
+// Si no hay ninguna relación devuelve null y la UI cae de vuelta a los datos
+// básicos (nombre, rol) que ya trae `otro`.
 export async function fetchFichaContacto(perfilId) {
   if (!perfilId) return null;
   const { data, error } = await supabase.rpc('relevo_ficha_contacto', { p_perfil_id: perfilId });

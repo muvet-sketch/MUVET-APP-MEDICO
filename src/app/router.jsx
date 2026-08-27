@@ -24,6 +24,8 @@ import N29PerfilClinica from '../screens/n29-perfil-clinica';
 import N30CoberturaServicio from '../screens/n30-cobertura-servicio';
 import ChatCobertura from '../screens/n30-cobertura-servicio/ChatCobertura';
 import N31Notificaciones from '../screens/n31-notificaciones';
+import N32Auxiliar from '../screens/n32-auxiliar';
+import ConversacionApoyo from '../screens/n32-auxiliar/ConversacionApoyo';
 import Soporte from '../screens/soporte';
 
 export default function AppRouter() {
@@ -102,6 +104,14 @@ export default function AppRouter() {
           excepción explícita a D-540 (chat en tiempo real) confirmada con el fundador. */}
       <Route path="/cobertura-servicio" element={<ProtectedRoute allowedRoles={['medico']}><N30CoberturaServicio /></ProtectedRoute>} />
       <Route path="/cobertura-servicio/chat/:solicitudId" element={<ProtectedRoute allowedRoles={['medico']}><ChatCobertura /></ProtectedRoute>} />
+      {/* MUVET Auxiliar (N-32, migración 0028): médico↔auxiliar. Salió de
+          MUVET Turnos, que se queda con lo que involucra a una clínica.
+          ⚠️ La ruta es /apoyo y las tablas apoyo_*: el identificador interno NO
+          es `auxiliar` porque ese ya es un valor de perfiles.rol. Ver el bloque
+          de lib/nombresModulos.js.
+          Solo médico y auxiliar: la clínica no participa en este matching. */}
+      <Route path="/apoyo" element={<ProtectedRoute allowedRoles={['medico', 'auxiliar']}><N32Auxiliar /></ProtectedRoute>} />
+      <Route path="/apoyo/conversacion/:conversacionId" element={<ProtectedRoute allowedRoles={['medico', 'auxiliar']}><ConversacionApoyo /></ProtectedRoute>} />
       {/* N-31: Notificaciones (migración 0026). Abierta a los 3 actores, igual
           que /relevo y /historial — las notificaciones de MUVET Turnos le
           llegan a cualquiera de ellos; las de MUVET Relevo (médico↔médico)

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
+import { CORTO_AUXILIAR, CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
 
 // N-31 · Notificaciones. Capa de acceso a la tabla `notificaciones`
 // (migración 0026): una fila por evento, escrita por triggers del backend
@@ -31,6 +31,7 @@ export const FAMILIAS_NOTIFICACION = [
   { value: '', label: 'Todas' },
   { value: 'relevo', label: CORTO_TURNOS },
   { value: 'cobertura', label: CORTO_RELEVO },
+  { value: 'apoyo', label: CORTO_AUXILIAR },
 ];
 
 // Presentación por tipo (los mismos valores del CHECK de 0026 + 0027). Los
@@ -42,12 +43,20 @@ const PRESENTACION = {
   relevo_acuerdo: { icono: '🤝', familia: 'relevo' },
   relevo_confirmada: { icono: '✅', familia: 'relevo' },
   relevo_descartada: { icono: '✖️', familia: 'relevo' },
+  relevo_finalizada: { icono: '🏁', familia: 'relevo' }, // 0028
   relevo_postulacion: { icono: '✅', familia: 'relevo' }, // histórico (pre-0027)
   relevo_decision: { icono: '📣', familia: 'relevo' }, // histórico (pre-0027)
   relevo_respuesta: { icono: '↩️', familia: 'relevo' }, // histórico (pre-0027)
   cobertura_ofrecimiento: { icono: '🤝', familia: 'cobertura' },
   cobertura_mensaje: { icono: '💬', familia: 'cobertura' },
   cobertura_finalizada: { icono: '🏁', familia: 'cobertura' },
+  // MUVET Auxiliar (0028)
+  apoyo_contacto: { icono: '💬', familia: 'apoyo' },
+  apoyo_mensaje: { icono: '💬', familia: 'apoyo' },
+  apoyo_acuerdo: { icono: '🤝', familia: 'apoyo' },
+  apoyo_confirmada: { icono: '✅', familia: 'apoyo' },
+  apoyo_descartada: { icono: '✖️', familia: 'apoyo' },
+  apoyo_finalizada: { icono: '🏁', familia: 'apoyo' },
 };
 
 const PRESENTACION_DEFECTO = { icono: '🔔', familia: '' };

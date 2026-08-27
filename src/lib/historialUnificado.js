@@ -19,11 +19,16 @@
 // existían en cada módulo.
 import { fetchHistorial } from './coberturaServicio';
 import { fetchMisPublicaciones, fetchMisConversaciones } from './relevo';
-import { CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
+import { fetchMisConversacionesApoyo } from './apoyo';
+import { CORTO_AUXILIAR, CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
 
 // Estados terminales de cada fuente — lo que ya terminó y por eso es historial.
 const RELEVO_OFERTA_TERMINAL = ['cancelada', 'finalizada'];
-const RELEVO_CONVERSACION_TERMINAL = ['aceptada', 'descartada'];
+// 0028: 'aceptada' deja de ser terminal en Turnos — el turno confirmado sigue
+// vivo (con su chat abierto) hasta que alguien lo da por finalizado. Mientras
+// está en 'aceptada' aparece en "Servicios aceptados" del Home, no acá.
+const RELEVO_CONVERSACION_TERMINAL = ['descartada', 'finalizada'];
+const APOYO_CONVERSACION_TERMINAL = ['descartada', 'finalizada'];
 
 // Los `value` son identificadores internos y no se tocan; solo cambian las
 // etiquetas. De ahí que 'cobertura' se muestre como "Relevo" y 'relevo' como
@@ -32,6 +37,7 @@ export const ORIGENES_HISTORIAL = [
   { value: '', label: 'Todo' },
   { value: 'cobertura', label: CORTO_RELEVO },
   { value: 'relevo', label: CORTO_TURNOS },
+  { value: 'apoyo', label: CORTO_AUXILIAR },
 ];
 
 // `origen` distingue cómo se renderiza cada ítem (ver ItemHistorial.jsx);
@@ -44,10 +50,11 @@ function normalizar(origen, familia, fecha, raw) {
 // sobre tres fuentes, así que no hay forma de limitar antes sin desordenar el
 // cruce. Lo usa la vista previa del Home (últimos 3); N-9 la llama sin límite.
 export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
-  const [cobertura, publicaciones, conversaciones] = await Promise.all([
+  const [cobertura, publicaciones, conversaciones, conversacionesApoyo] = await Promise.all([
     fetchHistorial(perfilId),
     fetchMisPublicaciones(perfilId),
     fetchMisConversaciones(perfilId),
+    fetchMisConversacionesApoyo(perfilId),
   ]);
 
   const items = [
@@ -72,6 +79,14 @@ export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
     ...conversaciones
       .filter((c) => RELEVO_CONVERSACION_TERMINAL.includes(c.estado))
       .map((c) => normalizar('relevo_conversacion', 'relevo', c.cerrada_at ?? c.ultimo_mensaje_at, c)),
+
+    // MUVET Auxiliar (0028). Solo las cerradas: un servicio 'aceptada' sigue
+    // en curso y vive en "Servicios aceptados" del Home. A diferencia de
+    // Cobertura, el historial del chat NO se borró al finalizar, así que estos
+    // ítems sí se pueden abrir para releerlo.
+    ...conversacionesApoyo
+      .filter((c) => APOYO_CONVERSACION_TERMINAL.includes(c.estado))
+      .map((c) => normalizar('apoyo_conversacion', 'apoyo', c.cerrada_at ?? c.ultimo_mensaje_at, c)),
   ];
 
   const ordenados = items.sort((a, b) => new Date(b.fecha ?? 0) - new Date(a.fecha ?? 0));

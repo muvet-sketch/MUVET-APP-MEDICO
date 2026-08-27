@@ -117,6 +117,8 @@ Nomenclatura canónica. Prohibido inventar términos alternativos.
   |---|---|---|---|
   | **MUVET Turnos** — bolsa gremial multi-rol | N-26 | `/relevo` | `lib/relevo.js`, `relevo_*` |
   | **MUVET Relevo** — médico↔médico, pasar un servicio | N-30 | `/cobertura-servicio` | `lib/coberturaServicio.js`, `cobertura_*` |
+  | **MUVET Auxiliar** / apoyo / /apoyo |
+
 
   Un chip etiquetado "Relevo" cuyo `value` es `'cobertura'` **es correcto**.
   Nombres anteriores, ya retirados de la UI: "MUVET Relevo" para N-26 y
@@ -125,6 +127,8 @@ Nomenclatura canónica. Prohibido inventar términos alternativos.
 - **"Barra Trueta"** = barra de navegación persistente de la Constelación. Es
   un **componente**, no una pantalla independiente.
 - **"Tutor"** = dueño de la mascota. Nunca usar "propietario" en la UI.
+- MUVET Auxiliar / apoyo / /apoyo
+
 
 ---
 

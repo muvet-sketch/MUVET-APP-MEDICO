@@ -5,11 +5,15 @@
 // OJO: la ruta sigue siendo /relevo y el identificador interno `relevo` — solo
 // cambió el nombre de cara al usuario. Ver el bloque de lib/nombresModulos.js.
 //
-// D-540 modificado en 0027: hay hilo 1:1 privado mientras dura la negociación,
-// y el turno se cierra con el acuerdo de AMBAS partes. D-545 (revisado, ver
-// PUBLICACIONES_PERMITIDAS_POR_ROL en lib/relevo.js): médico ofrece a clínicas
-// o solicita apoyo a un auxiliar; auxiliar ofrece a clínicas y a médicos;
-// clínica busca médico o auxiliar.
+// D-540 modificado en 0027 y otra vez en 0028: hay hilo 1:1 privado, ahora en
+// TIEMPO REAL, que sobrevive al acuerdo y se cierra al finalizar el servicio.
+// El turno se cierra con el acuerdo de AMBAS partes.
+//
+// D-545 (revisado en 0028, ver PUBLICACIONES_PERMITIDAS_POR_ROL en
+// lib/relevo.js): toda publicación de este módulo involucra a una clínica —
+// médico y auxiliar ofrecen disponibilidad a clínicas, y la clínica busca
+// médico o auxiliar. El matching médico↔auxiliar se mudó a MUVET Auxiliar
+// (N-32, ruta /apoyo).
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ScreenHeader, BottomNav } from '../../components/ui';

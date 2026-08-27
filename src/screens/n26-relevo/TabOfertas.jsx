@@ -13,7 +13,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Badge, Button, Modal, Toast } from '../../components/ui';
 import { formatCOP } from '../../lib/format';
-import { fetchPublicacionesActivas, fetchMisConversaciones, iniciarConversacion, formatFranjaHoraria } from '../../lib/relevo';
+import {
+  fetchPublicacionesActivas,
+  fetchMisConversaciones,
+  iniciarConversacion,
+  formatFranjaHoraria,
+  PUBLICACIONES_PERMITIDAS_POR_ROL,
+} from '../../lib/relevo';
 
 const ACTOR_BADGE = {
   clinica: { label: '🏥 Clínica Veterinaria', tone: 'info' },
@@ -26,15 +32,22 @@ const ACTOR_BADGE = {
 // policy de insert de relevo_conversaciones — así que "Contactar" nunca queda
 // habilitado fuera de la audiencia declarada de la publicación.
 //
-// Sub-filtro por rol del AUTOR sobre ese conjunto ya acotado. Con el matching
-// por rol_objetivo, el propio rol nunca aparece como autor de una publicación
-// dirigida a mí (nadie se dirige a su propio rol en la matriz D-545), así que
-// se excluye de las opciones para no mostrar un botón que siempre está vacío.
-const FILTROS_AUTOR_BASE = [
-  { value: 'clinica', label: 'Clínicas' },
-  { value: 'medico', label: 'Médicos' },
-  { value: 'auxiliar', label: 'Auxiliares' },
-];
+// Sub-filtro por rol del AUTOR sobre ese conjunto ya acotado.
+//
+// Las opciones se DERIVAN de la matriz (PUBLICACIONES_PERMITIDAS_POR_ROL) en
+// vez de listar los tres roles menos el propio: tras 0028 esa resta ya no da
+// el conjunto correcto. Un médico solo ve ofertas dirigidas a médicos, y la
+// única que las publica es la clínica — un chip "Auxiliares" estaría siempre
+// vacío. Derivarlo evita que la lista se vuelva a desalinear si la matriz
+// cambia otra vez.
+const ROL_LABEL_PLURAL = { clinica: 'Clínicas', medico: 'Médicos', auxiliar: 'Auxiliares' };
+
+function filtrosAutorPara(rol) {
+  const autores = Object.entries(PUBLICACIONES_PERMITIDAS_POR_ROL)
+    .filter(([autorRol, combos]) => autorRol !== rol && combos.some((c) => c.rolObjetivo === rol))
+    .map(([autorRol]) => autorRol);
+  return autores.map((r) => ({ value: r, label: ROL_LABEL_PLURAL[r] ?? r }));
+}
 
 const AUDIENCIA_LABEL = { clinica: 'clínicas', medico: 'médicos', auxiliar: 'auxiliares' };
 
@@ -71,10 +84,7 @@ function HabilidadesResumen({ publicacion }) {
 export default function TabOfertas({ perfil, rolInicial }) {
   const navigate = useNavigate();
   const [rolActor, setRolActor] = useState(rolInicial || '');
-  const FILTROS_AUTOR = [
-    { value: '', label: 'Todo' },
-    ...FILTROS_AUTOR_BASE.filter((f) => f.value !== perfil.rol),
-  ];
+  const FILTROS_AUTOR = [{ value: '', label: 'Todo' }, ...filtrosAutorPara(perfil.rol)];
   const [publicaciones, setPublicaciones] = useState([]);
   const [conversaciones, setConversaciones] = useState([]);
   const [loading, setLoading] = useState(true);

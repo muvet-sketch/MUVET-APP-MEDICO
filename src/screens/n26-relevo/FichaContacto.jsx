@@ -5,11 +5,16 @@
 //
 // Trae lo que `perfiles_publico` (0014) deliberadamente NO expone a cualquier
 // autenticado. Dos niveles, según el estado de la conversación:
-//   abierta   → matrícula + validación, especialidad, zona, bio, NIT.
-//   aceptada  → además teléfono y dirección de sede.
-// El backend es quien decide: `relevo_ficha_contacto` devuelve esos dos campos
-// en null mientras la conversación no esté aceptada, así que acá alcanza con
-// no renderizar lo que llegue vacío.
+//   abierta                → matrícula + validación, especialidad, zona, bio, NIT.
+//   aceptada / finalizada  → además la dirección de sede de la clínica.
+// El backend es quien decide: `relevo_ficha_contacto` devuelve ese campo en
+// null mientras el turno no esté confirmado, así que acá alcanza con no
+// renderizar lo que llegue vacío.
+//
+// 0028: el TELÉFONO ya no aparece en ningún nivel — la función dejó de
+// devolverlo. Ningún número de teléfono se muestra en la app: toda la
+// comunicación se canaliza por el chat del hilo, que desde 0028 sigue abierto
+// mientras dura el servicio en vez de cerrarse al aceptar.
 //
 // `ficha` es null mientras carga o si el backend no encuentra relación — en
 // ese caso no se muestra nada y la pantalla se queda con los datos básicos.
@@ -28,13 +33,12 @@ export default function FichaContacto({ ficha, cargando }) {
   if (!ficha) return null;
 
   if (ficha.rol === 'clinica') {
-    if (!ficha.nit && !ficha.direccion_sede && !ficha.telefono) return null;
+    if (!ficha.nit && !ficha.direccion_sede) return null;
     return (
       <div className="flex flex-col gap-1 rounded-[10px] border border-[#E1E8ED] bg-[#F4F7F9] p-3">
         <p className="text-[12px] font-semibold text-[#0A1628]">Datos de la clínica</p>
         {ficha.nit && <p className="text-[12px] text-[#5A6B7A]">NIT: {ficha.nit}</p>}
-        {ficha.direccion_sede && <p className="text-[12px] text-[#5A6B7A]">Dirección: {ficha.direccion_sede}</p>}
-        {ficha.telefono && <p className="text-[12px] text-[#5A6B7A]">Tel: {ficha.telefono}</p>}
+        {ficha.direccion_sede && <p className="text-[12px] text-[#5A6B7A]">📍 {ficha.direccion_sede}</p>}
       </div>
     );
   }
@@ -52,7 +56,6 @@ export default function FichaContacto({ ficha, cargando }) {
       {ficha.especialidad && <p className="text-[12px] text-[#5A6B7A]">{ficha.especialidad}</p>}
       {ficha.zona_cobertura && <p className="text-[12px] text-[#5A6B7A]">Zona: {ficha.zona_cobertura}</p>}
       {ficha.bio && <p className="text-[12px] text-[#0A1628]">{ficha.bio}</p>}
-      {ficha.telefono && <p className="text-[12px] text-[#5A6B7A]">Tel: {ficha.telefono}</p>}
     </div>
   );
 }

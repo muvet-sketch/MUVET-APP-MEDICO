@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
-import { signOut } from '../../lib/auth';
 import {
   expirarSolicitudesVencidas,
   fetchServicioActivoEnCamino,
@@ -13,7 +12,8 @@ import ValidationBadge from './ValidationBadge';
 import QuickAccess from './QuickAccess';
 import OfertasRecientes from '../../components/home/OfertasRecientes';
 import HistorialReciente from '../../components/home/HistorialReciente';
-import { Card, Button, Toast, BottomNav, NotificationBell } from '../../components/ui';
+import ServiciosAceptados from '../../components/home/ServiciosAceptados';
+import { Card, Button, Toast, BottomNav, NotificationBell, AppMenu } from '../../components/ui';
 import N3Solicitudes from '../n3-solicitudes';
 
 export default function N2Home() {
@@ -117,11 +117,12 @@ export default function N2Home() {
           <p className="text-[12px] text-[#5A6B7A]">Hola,</p>
           <h1 className="text-[18px] font-semibold text-[#0A1628]">{perfil.nombre_completo}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        {/* 0028: "Salir" y "Mi perfil" viven ahora en el menú hamburguesa —
+            la pestaña "Perfil" de la barra inferior cedió su lugar a
+            MUVET Auxiliar. */}
+        <div className="flex items-center gap-1">
           <NotificationBell perfilId={perfil.id} />
-          <button type="button" onClick={signOut} className="text-[12px] text-[#5A6B7A] underline underline-offset-2">
-            Salir
-          </button>
+          <AppMenu />
         </div>
       </div>
 
@@ -141,6 +142,10 @@ export default function N2Home() {
       )}
 
       <QuickAccess disponible={perfil.disponible} servicioActivo={servicioActivo} />
+
+      {/* Lo acordado en MUVET Turnos y MUVET Auxiliar que sigue en curso: con
+          quién, dónde, y la puerta al chat (0028). */}
+      <ServiciosAceptados perfil={perfil} />
 
       {/* "Actividad reciente" (mock) se movió a N-27 · Mis Domicilios, que es
           su módulo real. Este espacio lo ocupan ahora las ofertas de MUVET
