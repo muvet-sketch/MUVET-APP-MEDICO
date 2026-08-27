@@ -92,3 +92,18 @@ export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
   const ordenados = items.sort((a, b) => new Date(b.fecha ?? 0) - new Date(a.fecha ?? 0));
   return limite ? ordenados.slice(0, limite) : ordenados;
 }
+
+// Un ítem "pendiente de pago" es un SERVICIO finalizado (no una oferta, ni una
+// negociación descartada/cancelada) cuyo `pago_estado` sigue en 'pendiente'
+// (migración 0029). Lo usa el chip de N-9 y el aviso del Home.
+export function esServicioFinalizado(item) {
+  if (item?.origen === 'cobertura') return item.raw?.estado === 'finalizada';
+  if (item?.origen === 'relevo_conversacion' || item?.origen === 'apoyo_conversacion') {
+    return item.raw?.estado === 'finalizada';
+  }
+  return false;
+}
+
+export function estaPendienteDePago(item) {
+  return esServicioFinalizado(item) && (item.raw?.pago_estado ?? 'pendiente') === 'pendiente';
+}

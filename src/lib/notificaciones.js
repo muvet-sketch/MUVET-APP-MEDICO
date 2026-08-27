@@ -44,12 +44,14 @@ const PRESENTACION = {
   relevo_confirmada: { icono: '✅', familia: 'relevo' },
   relevo_descartada: { icono: '✖️', familia: 'relevo' },
   relevo_finalizada: { icono: '🏁', familia: 'relevo' }, // 0028
+  relevo_pago: { icono: '💳', familia: 'relevo' }, // 0029
   relevo_postulacion: { icono: '✅', familia: 'relevo' }, // histórico (pre-0027)
   relevo_decision: { icono: '📣', familia: 'relevo' }, // histórico (pre-0027)
   relevo_respuesta: { icono: '↩️', familia: 'relevo' }, // histórico (pre-0027)
   cobertura_ofrecimiento: { icono: '🤝', familia: 'cobertura' },
   cobertura_mensaje: { icono: '💬', familia: 'cobertura' },
   cobertura_finalizada: { icono: '🏁', familia: 'cobertura' },
+  cobertura_pago: { icono: '💳', familia: 'cobertura' }, // 0029
   // MUVET Auxiliar (0028)
   apoyo_contacto: { icono: '💬', familia: 'apoyo' },
   apoyo_mensaje: { icono: '💬', familia: 'apoyo' },
@@ -57,6 +59,7 @@ const PRESENTACION = {
   apoyo_confirmada: { icono: '✅', familia: 'apoyo' },
   apoyo_descartada: { icono: '✖️', familia: 'apoyo' },
   apoyo_finalizada: { icono: '🏁', familia: 'apoyo' },
+  apoyo_pago: { icono: '💳', familia: 'apoyo' }, // 0029
 };
 
 const PRESENTACION_DEFECTO = { icono: '🔔', familia: '' };

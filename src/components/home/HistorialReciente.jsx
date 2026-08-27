@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Badge } from '../ui';
 import { formatFechaCorta, truncarTexto } from '../../lib/format';
-import { fetchHistorialUnificado } from '../../lib/historialUnificado';
+import { fetchHistorialUnificado, estaPendienteDePago } from '../../lib/historialUnificado';
 import { ICONO_AUXILIAR, ICONO_RELEVO, ICONO_TURNOS } from '../../lib/nombresModulos';
 
 // Vista previa del historial único (N-9) en el Home de los tres roles: los
@@ -105,7 +105,14 @@ export default function HistorialReciente({ perfil }) {
                   </p>
                   <Badge tone={badge.tone}>{badge.label}</Badge>
                 </div>
-                {item.fecha && <p className="text-[11px] text-[#5A6B7A]">{formatFechaCorta(item.fecha)}</p>}
+                <p className="text-[11px] text-[#5A6B7A]">
+                  {item.fecha ? formatFechaCorta(item.fecha) : ''}
+                  {estaPendienteDePago(item) && (
+                    <span className="text-[#B26A00]">
+                      {item.fecha ? ' · ' : ''}Pendiente de pago
+                    </span>
+                  )}
+                </p>
               </button>
             </Card>
           );

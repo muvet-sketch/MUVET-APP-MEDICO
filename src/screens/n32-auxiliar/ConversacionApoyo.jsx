@@ -18,6 +18,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { ScreenHeader, Card, Badge, Button, Modal, Toast } from '../../components/ui';
 import BurbujasMensajes from '../../components/chat/BurbujasMensajes';
+import PanelPagoServicio from '../../components/PanelPagoServicio';
 import DireccionEncuentro from './DireccionEncuentro';
 import { validateResultFile } from '../../lib/fileValidation';
 import { formatCOP } from '../../lib/format';
@@ -311,6 +312,20 @@ export default function ConversacionApoyo() {
             editable={puedeEscribir}
             onGuardada={setDireccion}
             showToast={showToast}
+          />
+        )}
+
+        {(aceptada || conversacion.estado === 'finalizada') && (
+          <PanelPagoServicio
+            modulo="apoyo"
+            servicioId={conversacion.id}
+            fila={conversacion}
+            perfil={perfil}
+            nombreContraparte={nombreOtro}
+            onCambio={async () => {
+              const actualizada = await fetchConversacionApoyo(conversacionId, perfil.id);
+              setConversacion(actualizada);
+            }}
           />
         )}
       </div>

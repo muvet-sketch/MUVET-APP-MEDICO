@@ -15,6 +15,7 @@ import HistorialReciente from '../../components/home/HistorialReciente';
 import ServiciosAceptados from '../../components/home/ServiciosAceptados';
 import PerfilAuxiliarInline from './PerfilAuxiliarInline';
 import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
+import MetodosPagoSection from '../../components/MetodosPagoSection';
 
 export default function N28HomeSimplificado() {
   const { perfil } = useAuth();
@@ -109,6 +110,9 @@ export default function N28HomeSimplificado() {
           {/* El auxiliar configura sus habilidades aquí; la clínica no las
               tiene en perfil (las declara por oferta, ver 0015). */}
           <HabilidadesPerfilSection />
+          {/* Datos de pago del auxiliar (0029). La clínica no lleva esta
+              sección; ya está fuera por el `!esClinica` de arriba. */}
+          <MetodosPagoSection />
         </>
       )}
 

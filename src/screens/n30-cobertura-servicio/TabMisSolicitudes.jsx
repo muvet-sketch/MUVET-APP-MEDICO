@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Toast } from '../../components/ui';
 import { fetchMisSolicitudesActivas, cancelarSolicitud, finalizarServicio } from '../../lib/coberturaServicio';
+import PanelPagoServicio from '../../components/PanelPagoServicio';
 import SolicitudCard from './SolicitudCard';
 import SolicitudForm from './SolicitudForm';
 
@@ -127,6 +128,21 @@ export default function TabMisSolicitudes({ perfil }) {
                 </>
               )}
             </div>
+
+            {s.estado === 'cubierta' && (
+              <div className="mt-2">
+                <PanelPagoServicio
+                  modulo="cobertura"
+                  servicioId={s.id}
+                  fila={s}
+                  perfil={perfil}
+                  nombreContraparte={
+                    s.autor_id === perfil.id ? s.cobertura?.nombre_completo : s.autor?.nombre_completo
+                  }
+                  onCambio={cargar}
+                />
+              </div>
+            )}
           </SolicitudCard>
         );
       })}

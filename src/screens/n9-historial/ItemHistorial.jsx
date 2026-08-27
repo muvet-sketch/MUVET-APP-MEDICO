@@ -11,6 +11,14 @@ import {
 } from '../../lib/nombresModulos';
 import { labelSubtipo } from '../../lib/apoyo';
 import SolicitudCard from '../n30-cobertura-servicio/SolicitudCard';
+import PanelPagoServicio from '../../components/PanelPagoServicio';
+
+// Badge de estado de pago (migración 0029). Solo tiene sentido en un servicio
+// finalizado; lo pinta cada rama de servicio de abajo.
+function PagoBadge({ estado }) {
+  const pagado = estado === 'pagado';
+  return <Badge tone={pagado ? 'ok' : 'alert'}>{pagado ? 'Pagado' : 'Pendiente de pago'}</Badge>;
+}
 
 // Cada ítem del historial único se pinta según su origen. La tarjeta de N-30 se
 // reutiliza tal cual (ya cubre los estados 'finalizada'/'cancelada' en su
@@ -52,17 +60,39 @@ function OrigenTag({ origen, fecha }) {
 // mensajes sueltos post-aceptación. Una conversación cerrada se abre en su
 // propio hilo, en solo lectura, y el contacto directo (teléfono) sale de la
 // ficha ampliada dentro de esa pantalla.
-export default function ItemHistorial({ item, perfilId }) {
+export default function ItemHistorial({ item, perfilId, perfil }) {
   const navigate = useNavigate();
   const { origen, fecha, raw } = item;
 
   if (origen === 'cobertura') {
+    // MUVET Relevo borra el chat al finalizar (0023), así que este es el único
+    // sitio donde el pago de una cobertura ya cerrada se puede registrar y
+    // consultar después (0029).
+    const finalizada = raw.estado === 'finalizada';
+    const nombreContraparte =
+      raw.autor_id === perfilId ? raw.cobertura?.nombre_completo : raw.autor?.nombre_completo;
     return (
-      <SolicitudCard solicitud={raw}>
-        <div className="border-t border-[#E1E8ED] pt-2">
-          <OrigenTag origen={origen} fecha={fecha} />
-        </div>
-      </SolicitudCard>
+      <div className="flex flex-col gap-2">
+        <SolicitudCard solicitud={raw}>
+          <div className="flex flex-col gap-2 border-t border-[#E1E8ED] pt-2">
+            {finalizada && (
+              <div>
+                <PagoBadge estado={raw.pago_estado} />
+              </div>
+            )}
+            <OrigenTag origen={origen} fecha={fecha} />
+          </div>
+        </SolicitudCard>
+        {finalizada && perfil && (
+          <PanelPagoServicio
+            modulo="cobertura"
+            servicioId={raw.id}
+            fila={raw}
+            perfil={perfil}
+            nombreContraparte={nombreContraparte}
+          />
+        )}
+      </div>
     );
   }
 
@@ -90,7 +120,10 @@ export default function ItemHistorial({ item, perfilId }) {
       <Card className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-2">
           <p className="text-[14px] font-medium text-[#0A1628]">{nombre}</p>
-          <Badge tone={badgeApoyo.tone}>{badgeApoyo.label}</Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge tone={badgeApoyo.tone}>{badgeApoyo.label}</Badge>
+            {raw.estado === 'finalizada' && <PagoBadge estado={raw.pago_estado} />}
+          </div>
         </div>
         <p className="text-[12px] text-[#5A6B7A]">{labelSubtipo(raw.servicio_subtipo)}</p>
         <p className="text-[12px] text-[#5A6B7A]">
@@ -119,7 +152,10 @@ export default function ItemHistorial({ item, perfilId }) {
     <Card className="flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[14px] font-medium text-[#0A1628]">{nombreOtro}</p>
-        <Badge tone={badge.tone}>{badge.label}</Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge tone={badge.tone}>{badge.label}</Badge>
+          {raw.estado === 'finalizada' && <PagoBadge estado={raw.pago_estado} />}
+        </div>
       </div>
       <p className="text-[12px] text-[#5A6B7A]">
         Sobre: {raw.publicacion?.descripcion || '(sin descripción)'}

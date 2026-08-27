@@ -3,6 +3,7 @@ import { ScreenHeader, BottomNav } from '../../components/ui';
 import HeaderPerfil from './HeaderPerfil';
 import DatosProfesionalesSection from './DatosProfesionalesSection';
 import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
+import MetodosPagoSection from '../../components/MetodosPagoSection';
 import MatriculaSection from './MatriculaSection';
 import CalificacionSection from './CalificacionSection';
 import NotificacionesSection from './NotificacionesSection';
@@ -24,6 +25,7 @@ export default function N8PerfilMedico() {
             elimina el código: PlanCard.jsx y LogoFirmaSection.jsx quedan
             intactos para reactivarse en la iteración de domicilios. */}
         <DatosProfesionalesSection />
+        <MetodosPagoSection />
         <HabilidadesPerfilSection />
         <MatriculaSection />
         <CalificacionSection />

@@ -15,13 +15,14 @@
 import { useEffect, useState } from 'react';
 import { Card, ScreenHeader, BottomNav } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
-import { fetchHistorialUnificado, ORIGENES_HISTORIAL } from '../../lib/historialUnificado';
+import { fetchHistorialUnificado, ORIGENES_HISTORIAL, estaPendienteDePago } from '../../lib/historialUnificado';
 import ItemHistorial from './ItemHistorial';
 
 export default function N9Historial() {
   const { perfil } = useAuth();
   const [items, setItems] = useState([]);
   const [familia, setFamilia] = useState('');
+  const [soloPendientesPago, setSoloPendientesPago] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -44,7 +45,9 @@ export default function N9Historial() {
     };
   }, [perfil?.id]);
 
-  const visibles = familia ? items.filter((i) => i.familia === familia) : items;
+  const visibles = items
+    .filter((i) => (familia ? i.familia === familia : true))
+    .filter((i) => (soloPendientesPago ? estaPendienteDePago(i) : true));
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -66,18 +69,37 @@ export default function N9Historial() {
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={() => setSoloPendientesPago((v) => !v)}
+          className={`self-start rounded-[10px] border px-3 py-2 text-[11px] ${
+            soloPendientesPago
+              ? 'border-[#B26A00] bg-[#F5A62333] text-[#0A1628]'
+              : 'border-[#E1E8ED] text-[#5A6B7A]'
+          }`}
+        >
+          {soloPendientesPago ? '✓ Solo pendientes de pago' : 'Pendientes de pago'}
+        </button>
+
         {error && <p className="text-[12px] text-[#C63B3B]">{error}</p>}
         {loading && <p className="text-[12px] text-[#5A6B7A]">Cargando…</p>}
 
         {!loading && visibles.length === 0 && (
           <Card>
             <p className="text-[13px] text-[#5A6B7A]">
-              {familia ? 'Nada finalizado todavía en esta categoría.' : 'Todavía no tienes actividad finalizada.'}
+              {soloPendientesPago
+                ? 'No tienes servicios pendientes de pago.'
+                : familia
+                  ? 'Nada finalizado todavía en esta categoría.'
+                  : 'Todavía no tienes actividad finalizada.'}
             </p>
           </Card>
         )}
 
-        {!loading && visibles.map((item) => <ItemHistorial key={item.id} item={item} perfilId={perfil?.id} />)}
+        {!loading &&
+          visibles.map((item) => (
+            <ItemHistorial key={item.id} item={item} perfilId={perfil?.id} perfil={perfil} />
+          ))}
       </div>
 
       <BottomNav />

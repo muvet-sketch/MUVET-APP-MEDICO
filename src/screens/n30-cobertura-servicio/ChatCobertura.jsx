@@ -10,6 +10,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { ScreenHeader, Button, Toast } from '../../components/ui';
 import { validateResultFile } from '../../lib/fileValidation';
+import PanelPagoServicio from '../../components/PanelPagoServicio';
 import {
   fetchSolicitud,
   fetchMensajesChat,
@@ -165,6 +166,22 @@ export default function ChatCobertura() {
         )}
         {!chatActivo && <p className="mt-1 text-[12px] font-medium text-[#C63B3B]">Este servicio ya fue finalizado. El chat está cerrado.</p>}
       </div>
+
+      {(solicitud.estado === 'cubierta' || solicitud.estado === 'finalizada') && (
+        <div className="px-5 py-3">
+          <PanelPagoServicio
+            modulo="cobertura"
+            servicioId={solicitud.id}
+            fila={solicitud}
+            perfil={perfil}
+            nombreContraparte={contraparte?.nombre_completo}
+            onCambio={async () => {
+              const actualizada = await fetchSolicitud(solicitudId);
+              if (actualizada) setSolicitud(actualizada);
+            }}
+          />
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {mensajes.length === 0 && <p className="py-8 text-center text-[13px] text-[#5A6B7A]">Todavía no hay mensajes. Coordina el servicio acá.</p>}

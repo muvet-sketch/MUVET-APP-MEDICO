@@ -50,6 +50,7 @@ import {
   formatFranjaHoraria,
 } from '../../lib/relevo';
 import FichaContacto from './FichaContacto';
+import PanelPagoServicio from '../../components/PanelPagoServicio';
 
 const ACTOR_LABEL = { clinica: '🏥 Clínica', auxiliar: '🧰 Auxiliar', medico: '🩺 Médico' };
 
@@ -286,6 +287,20 @@ export default function ConversacionRelevo() {
           )}
           <FichaContacto ficha={ficha} cargando={cargandoFicha} />
         </Card>
+
+        {(aceptada || conversacion.estado === 'finalizada') && (
+          <PanelPagoServicio
+            modulo="relevo"
+            servicioId={conversacion.id}
+            fila={conversacion}
+            perfil={perfil}
+            nombreContraparte={nombreOtro}
+            onCambio={async () => {
+              const actualizada = await fetchConversacion(conversacionId, perfil.id);
+              setConversacion(actualizada);
+            }}
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-5">
