@@ -59,6 +59,11 @@ export default function AppMenu() {
     navigate('/historial');
   }
 
+  function irAMejoras() {
+    setAbierto(false);
+    navigate('/mejoras');
+  }
+
   return (
     <div className="relative" ref={contenedorRef}>
       <button
@@ -93,6 +98,17 @@ export default function AppMenu() {
             className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
           >
             <span aria-hidden="true">📋</span> Historial
+          </button>
+          <div className="h-px bg-[#E1E8ED]" />
+          {/* N-33 (0036): abierta a los 3 roles, sin condición — cualquiera
+              tiene algo que decir del producto. */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={irAMejoras}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
+          >
+            <span aria-hidden="true">💡</span> Ayúdanos a Mejorar
           </button>
           <div className="h-px bg-[#E1E8ED]" />
           <button

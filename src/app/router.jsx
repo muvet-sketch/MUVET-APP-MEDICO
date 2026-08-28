@@ -27,6 +27,7 @@ import N31Notificaciones from '../screens/n31-notificaciones';
 import N32Auxiliar from '../screens/n32-auxiliar';
 import ConversacionApoyo from '../screens/n32-auxiliar/ConversacionApoyo';
 import Soporte from '../screens/soporte';
+import N33Mejoras from '../screens/n33-mejoras';
 
 export default function AppRouter() {
   return (
@@ -123,6 +124,13 @@ export default function AppRouter() {
           quien quedó bloqueado por posible suplantación (0025) — ProtectedRoute
           redirige aquí todo lo demás mientras dure la controversia. */}
       <Route path="/soporte" element={<ProtectedRoute><Soporte /></ProtectedRoute>} />
+      {/* N-33: "Ayúdanos a Mejorar" (migración 0036). Abierta a los 3 actores,
+          igual que /soporte — cualquiera tiene algo que decir del producto.
+          Solo se envía: el fundador lo lee por el Dashboard (vista
+          sugerencias_mejora_pendientes), no se responde dentro de la app.
+          Quien está en disputa (0025) no llega: ProtectedRoute lo rebota a
+          /soporte, y la RLS del insert exige `not perfil_en_disputa()`. */}
+      <Route path="/mejoras" element={<ProtectedRoute><N33Mejoras /></ProtectedRoute>} />
     </Routes>
   );
 }
