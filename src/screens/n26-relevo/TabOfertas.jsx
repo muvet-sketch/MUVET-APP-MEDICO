@@ -11,13 +11,14 @@
 // "Conversaciones". El relevo se cierra con el acuerdo de ambas partes.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge, Button, Modal, Toast } from '../../components/ui';
+import { Card, Badge, Button, Modal, Toast, Avatar } from '../../components/ui';
 import { formatCOP } from '../../lib/format';
 import {
   fetchPublicacionesActivas,
   fetchMisConversaciones,
   iniciarConversacion,
   formatFranjaHoraria,
+  zonaCoincide,
   PUBLICACIONES_PERMITIDAS_POR_ROL,
 } from '../../lib/relevo';
 
@@ -141,11 +142,12 @@ export default function TabOfertas({ perfil, rolInicial }) {
     conversaciones.filter((c) => c.interesado_id === perfil.id).map((c) => [c.publicacion_id, c]),
   );
 
+  // 0030: la cercanía ya no es match exacto de nombre. `zonaCoincide` acepta la
+  // misma ciudad o la misma área metropolitana, así que alguien en Envigado ve
+  // lo de Bello sin que le entren ofertas del otro lado del país.
   const visibles = publicaciones.filter((p) => {
     if (rolActor && p.autor?.rol !== rolActor) return false;
-    if (zonasPerfil.length === 0) return true;
-    const zonaPublicacion = (p.zona ?? '').toLowerCase();
-    return zonasPerfil.some((z) => zonaPublicacion.includes(z.toLowerCase()));
+    return zonaCoincide(p.zona, zonasPerfil);
   });
 
   async function handleContactar(e) {
@@ -174,8 +176,8 @@ export default function TabOfertas({ perfil, rolInicial }) {
         <p className="text-[11px] text-[#5A6B7A]">
           {zonasPerfil.length > 0 ? (
             <>
-              Zona de búsqueda: <span className="font-medium text-[#0A1628]">{zonasPerfil.join(', ')}</span> · edítala en
-              tu perfil.
+              Zona de búsqueda: <span className="font-medium text-[#0A1628]">{zonasPerfil.join(', ')}</span> y municipios
+              vecinos · edítala en tu perfil.
             </>
           ) : (
             <>Sin zona configurada: se muestran todas las ofertas. Define tu zona en tu perfil.</>
@@ -202,7 +204,7 @@ export default function TabOfertas({ perfil, rolInicial }) {
       {!loading && visibles.length === 0 && (
         <Card className="text-center text-[12px] text-[#5A6B7A]">
           {zonasPerfil.length > 0
-            ? `Sin ofertas activas en ${zonasPerfil.join(', ')}. Ajusta tu zona en el perfil para ver otras.`
+            ? `Sin ofertas activas en ${zonasPerfil.join(', ')} ni en municipios vecinos. Ajusta tu zona en el perfil para ver otras.`
             : 'Sin ofertas activas por ahora.'}
         </Card>
       )}
@@ -215,7 +217,10 @@ export default function TabOfertas({ perfil, rolInicial }) {
           return (
             <Card key={p.id} className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-[14px] font-semibold text-[#0A1628]">{nombreAutor}</p>
+                <div className="flex items-center gap-2">
+                  <Avatar fotoUrl={p.autor?.foto_url} nombre={nombreAutor} size={32} />
+                  <p className="text-[14px] font-semibold text-[#0A1628]">{nombreAutor}</p>
+                </div>
                 <Badge tone={badge.tone}>{badge.label}</Badge>
               </div>
               <p className="text-[13px] text-[#0A1628]">{p.descripcion || '(sin descripción)'}</p>

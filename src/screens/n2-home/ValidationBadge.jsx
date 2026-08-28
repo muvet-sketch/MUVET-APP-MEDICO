@@ -1,8 +1,10 @@
 import { Badge } from '../../components/ui';
 
 export default function ValidationBadge({ estadoValidacion }) {
+  // Una vez validada, el recuadro deja de tener sentido: al refrescar el Home
+  // con estado_validacion === 'validado' no se muestra nada.
   if (estadoValidacion === 'validado') {
-    return <Badge tone="ok">✅ Matrícula validada</Badge>;
+    return null;
   }
   if (estadoValidacion === 'rechazado') {
     return <Badge tone="critical">❌ Rechazada — contacta soporte</Badge>;

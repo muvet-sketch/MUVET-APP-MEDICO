@@ -1,27 +1,7 @@
 import { useState } from 'react';
-import { Card, Input, Button } from '../../components/ui';
+import { Card, Input, Select, Button } from '../../components/ui';
 import { ZONAS_COBERTURA } from '../../lib/municipios';
 import { TIPOS_SERVICIO_COBERTURA, ESPECIES_COBERTURA, TEMPERAMENTOS_COBERTURA, crearSolicitud } from '../../lib/coberturaServicio';
-
-function Select({ label, value, onChange, options, placeholder }) {
-  return (
-    <div className="w-full text-left">
-      <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">{label}</label>
-      <select
-        value={value}
-        onChange={onChange}
-        className="w-full rounded-[10px] border border-[#E1E8ED] bg-white px-3 py-2.5 text-[14px] text-[#0A1628]"
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
 
 // Formulario de nueva solicitud de MUVET Relevo (N-30): el médico describe
 // el servicio que no puede atender para que otro médico pueda ofrecerse a
@@ -75,7 +55,7 @@ export default function SolicitudForm({ perfil, onCreated, onCancel, showToast }
 
   return (
     <Card className="flex flex-col gap-3">
-      <p className="text-[14px] font-semibold text-[#0A1628]">Nueva solicitud de cobertura</p>
+      <p className="text-[14px] font-semibold text-[#0A1628]">Nueva solicitud de relevo</p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <Select label="Tipo de servicio" value={tipoServicio} onChange={(e) => setTipoServicio(e.target.value)} options={TIPOS_SERVICIO_COBERTURA} />
         {tipoServicio === 'Otro' && (

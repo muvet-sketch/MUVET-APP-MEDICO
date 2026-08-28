@@ -1,31 +1,35 @@
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui';
-import { ICONO_AUXILIAR, ICONO_TURNOS, NOMBRE_TURNOS } from '../../lib/nombresModulos';
+import {
+  ICONO_AUXILIAR,
+  ICONO_RELEVO,
+  ICONO_TURNOS,
+  NOMBRE_AUXILIAR,
+  NOMBRE_RELEVO,
+  NOMBRE_TURNOS,
+} from '../../lib/nombresModulos';
 
-// Solo lo que no está ya en la barra inferior ni tiene sección propia en el
-// Home: MUVET Relevo (ex Cobertura) y MUVET Auxiliar viven en la barra, e
-// Historial tiene su propia vista previa más abajo. Perfil se mudó al menú
-// hamburguesa del header (0028).
+// Rejilla 2×2 con las cuatro puertas de entrada del médico: sus domicilios y
+// los tres módulos gremiales. Antes solo estaban Domicilios y MUVET Turnos —
+// Relevo y Auxiliar vivían únicamente en la barra inferior, y Auxiliar además
+// bajo condición (D-549: solo con disponibilidad activa o servicio en curso).
+// Esa condición se retira: entrar al módulo es también gestionar lo propio, no
+// solo buscar a alguien, y eso no depende de estar disponible.
+//
+// ⚠️ Los nombres visibles NO coinciden con las rutas en ninguno de los tres
+// módulos gremiales: ver lib/nombresModulos.js.
 const LINKS = [
   { to: '/servicios', label: '🏠 Domicilios' },
   { to: '/relevo', label: `${ICONO_TURNOS} ${NOMBRE_TURNOS}` },
+  { to: '/cobertura-servicio', label: `${ICONO_RELEVO} ${NOMBRE_RELEVO}` },
+  { to: '/apoyo', label: `${ICONO_AUXILIAR} ${NOMBRE_AUXILIAR}` },
 ];
 
-// D-549: acceso rápido visible solo si el médico tiene disponibilidad activa o
-// un servicio en curso.
-//
-// 0028: apuntaba a `/relevo?tipo=ofrezco&rol=auxiliar`, un deep link que quedó
-// muerto al salir el matching médico↔auxiliar de MUVET Turnos. Ahora lleva al
-// tablón de MUVET Auxiliar, que ES la lista de auxiliares disponibles para un
-// médico — el filtro por rol ya no hace falta porque el módulo entero es eso.
-const BUSCAR_AUXILIAR_LINK = { to: '/apoyo?tab=disponibles', label: `${ICONO_AUXILIAR} Buscar auxiliar` };
-
-export default function QuickAccess({ disponible, servicioActivo }) {
+export default function QuickAccess() {
   const navigate = useNavigate();
-  const links = disponible || servicioActivo ? [...LINKS, BUSCAR_AUXILIAR_LINK] : LINKS;
   return (
     <div className="grid grid-cols-2 gap-2">
-      {links.map((link) => (
+      {LINKS.map((link) => (
         <Card key={link.to} className="cursor-pointer p-3 text-center" >
           <button
             type="button"

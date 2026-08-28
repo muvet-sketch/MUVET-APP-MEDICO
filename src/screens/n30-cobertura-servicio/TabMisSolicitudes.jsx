@@ -1,16 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Toast } from '../../components/ui';
-import { fetchMisSolicitudesActivas, cancelarSolicitud, finalizarServicio } from '../../lib/coberturaServicio';
-import PanelPagoServicio from '../../components/PanelPagoServicio';
+import {
+  fetchMisSolicitudesActivas,
+  cancelarSolicitud,
+  descartarPropuesta,
+  finalizarServicio,
+} from '../../lib/coberturaServicio';
 import SolicitudCard from './SolicitudCard';
 import SolicitudForm from './SolicitudForm';
 
-// "Mis Solicitudes": lo que publiqué (con opción de cancelar mientras nadie
-// se ofrezca) y lo que estoy cubriendo de otro médico, mientras el servicio
-// siga activo (abierta/cubierta). Una vez finalizado o cancelado sale de esta
-// pestaña y pasa al historial único de /historial (N-9), donde convive con el
-// historial de Relevo — ver lib/historialUnificado.js.
+// "Mis Solicitudes": lo que publiqué (con opción de cancelar mientras nadie se
+// ofrezca) y lo que estoy cubriendo de otro médico, mientras el servicio siga
+// activo (abierta/propuesta/cubierta). Una vez finalizado o cancelado sale de
+// esta pestaña y pasa al historial único de /historial (N-9) — ver
+// lib/historialUnificado.js.
+//
+// 0034 · dos cambios:
+//   · Estado intermedio 'propuesta': alguien se ofreció y falta que las DOS
+//     partes confirmen. El acuerdo se marca en el chat (mismo sitio que en
+//     Turnos y Auxiliar); acá se ve quién falta y se puede descartar.
+//     Descartar devuelve la solicitud al tablón, no la cierra.
+//   · Sin panel de pago: en MUVET Relevo el médico que releva le cobra
+//     directamente al tutor, así que no hay pago entre las dos partes.
 export default function TabMisSolicitudes({ perfil }) {
   const navigate = useNavigate();
   const [solicitudes, setSolicitudes] = useState([]);
@@ -44,7 +56,7 @@ export default function TabMisSolicitudes({ perfil }) {
   async function handleCancelar(id) {
     setProcesandoId(id);
     try {
-      await cancelarSolicitud(id, perfil.id);
+      await cancelarSolicitud(id);
       showToast('Solicitud cancelada.', 'ok');
       cargar();
     } catch (err) {
@@ -54,11 +66,24 @@ export default function TabMisSolicitudes({ perfil }) {
     }
   }
 
+  async function handleDescartar(id) {
+    setProcesandoId(id);
+    try {
+      await descartarPropuesta(id);
+      showToast('Propuesta descartada. La solicitud volvió al tablón.', 'ok');
+      cargar();
+    } catch (err) {
+      showToast(err.message ?? 'No se pudo descartar.', 'critical');
+    } finally {
+      setProcesandoId(null);
+    }
+  }
+
   async function handleFinalizar(id) {
     setProcesandoId(id);
     try {
       await finalizarServicio(id);
-      showToast('Servicio finalizado. El chat quedó cerrado y pasó a tu historial.', 'ok');
+      showToast('Servicio finalizado. El chat sigue abierto 24 horas.', 'ok');
       cargar();
     } catch (err) {
       showToast(err.message ?? 'No se pudo finalizar.', 'critical');
@@ -72,7 +97,7 @@ export default function TabMisSolicitudes({ perfil }) {
   return (
     <div className="flex flex-col gap-3 px-5 py-4 pb-24">
       {!mostrarForm && (
-        <Button onClick={() => setMostrarForm(true)}>+ Solicitar cobertura</Button>
+        <Button onClick={() => setMostrarForm(true)}>+ Publicar un relevo</Button>
       )}
 
       {mostrarForm && (
@@ -89,7 +114,7 @@ export default function TabMisSolicitudes({ perfil }) {
 
       {solicitudes.length === 0 && !mostrarForm && (
         <p className="py-8 text-center text-[13px] text-[#5A6B7A]">
-          No tienes solicitudes activas. Publica una si necesitas que otro médico te cubra un servicio.
+          No tienes solicitudes activas. Publica una si necesitas que otro médico te releve un servicio.
         </p>
       )}
 
@@ -97,7 +122,7 @@ export default function TabMisSolicitudes({ perfil }) {
         const soyAutor = s.autor_id === perfil.id;
         return (
           <SolicitudCard key={s.id} solicitud={s}>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-1 flex flex-wrap gap-2">
               {s.estado === 'abierta' && soyAutor && (
                 <Button
                   variant="danger"
@@ -108,6 +133,26 @@ export default function TabMisSolicitudes({ perfil }) {
                   Cancelar
                 </Button>
               )}
+
+              {s.estado === 'propuesta' && (
+                <>
+                  <Button
+                    fullWidth={false}
+                    onClick={() => navigate(`/cobertura-servicio/chat/${s.id}`)}
+                  >
+                    Coordinar y confirmar
+                  </Button>
+                  <Button
+                    variant="danger"
+                    fullWidth={false}
+                    disabled={procesandoId === s.id}
+                    onClick={() => handleDescartar(s.id)}
+                  >
+                    Descartar
+                  </Button>
+                </>
+              )}
+
               {s.estado === 'cubierta' && (
                 <>
                   <Button
@@ -128,21 +173,6 @@ export default function TabMisSolicitudes({ perfil }) {
                 </>
               )}
             </div>
-
-            {s.estado === 'cubierta' && (
-              <div className="mt-2">
-                <PanelPagoServicio
-                  modulo="cobertura"
-                  servicioId={s.id}
-                  fila={s}
-                  perfil={perfil}
-                  nombreContraparte={
-                    s.autor_id === perfil.id ? s.cobertura?.nombre_completo : s.autor?.nombre_completo
-                  }
-                  onCambio={cargar}
-                />
-              </div>
-            )}
           </SolicitudCard>
         );
       })}

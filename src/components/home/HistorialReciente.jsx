@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge } from '../ui';
+import { Card, Badge, Avatar } from '../ui';
 import { formatFechaCorta, truncarTexto } from '../../lib/format';
 import { fetchHistorialUnificado, estaPendienteDePago } from '../../lib/historialUnificado';
 import { ICONO_AUXILIAR, ICONO_RELEVO, ICONO_TURNOS } from '../../lib/nombresModulos';
@@ -99,10 +99,17 @@ export default function HistorialReciente({ perfil }) {
                 className="flex w-full flex-col gap-1 text-left"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-[14px] font-medium text-[#0A1628]">
-                    <span aria-hidden="true">{ORIGEN_ICONO[item.origen]} </span>
-                    {truncarTexto(tituloDe(item), 40)}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    {/* `foto_url` solo llega para contrapartes de rol 'clinica'
+                        (perfiles_publico, 0035): si está, es el logo de la clínica. */}
+                    {item.raw?.otro?.foto_url && (
+                      <Avatar fotoUrl={item.raw.otro.foto_url} nombre={tituloDe(item)} size={24} />
+                    )}
+                    <p className="text-[14px] font-medium text-[#0A1628]">
+                      <span aria-hidden="true">{ORIGEN_ICONO[item.origen]} </span>
+                      {truncarTexto(tituloDe(item), 40)}
+                    </p>
+                  </div>
                   <Badge tone={badge.tone}>{badge.label}</Badge>
                 </div>
                 <p className="text-[11px] text-[#5A6B7A]">

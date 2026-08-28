@@ -3,16 +3,34 @@ import { supabase } from './supabase';
 // MUVET Relevo (N-30) — médico↔médico. El módulo y sus tablas conservan el
 // nombre viejo, `cobertura`; el que se llama `relevo` en el código es MUVET
 // Turnos (N-26). Ver el bloque de lib/nombresModulos.js.
-// Un médico que no puede atender un servicio ya agendado
-// publica una solicitud con los detalles; otro médico puede ofrecerse a
-// cubrirlo. Al ofrecerse, ambos acceden a un chat en tiempo real (con
-// archivos/imágenes) activo solo mientras dura el servicio. Esquema, RLS y
-// los dos RPC (cobertura_ofrecerse, cobertura_finalizar_servicio) viven en
-// supabase/migrations/0023_cobertura_servicio.sql.
+// Un médico que no puede atender un servicio ya agendado publica una solicitud
+// con los detalles; otro médico puede ofrecerse a relevarlo. Al ofrecerse, ambos
+// acceden a un chat en tiempo real (con archivos/imágenes). Esquema y RLS
+// originales en supabase/migrations/0023_cobertura_servicio.sql; el ciclo de
+// vida vigente lo fija 0034 (ver el bloque de abajo).
 //
 // EXCEPCIÓN EXPLÍCITA A D-540 / "no incluir chat en tiempo real" (CLAUDE.md):
 // confirmada con el fundador, acotada a este módulo — ver el encabezado de
 // 0023 para el detalle. D-540 sigue intacto para Relevo (lib/relevo.js).
+//
+// ----------------------------------------------------------------------------
+// Migración 0034 — tres cambios que reescriben el ciclo de vida del módulo
+// ----------------------------------------------------------------------------
+//   1. ACUERDO MUTUO. Ofrecerse ya no cierra el trato: abre una negociación
+//      ('propuesta') y el servicio queda tomado ('cubierta') solo cuando LAS
+//      DOS partes marcan su acuerdo. Igual que Turnos (0027) y Auxiliar (0028).
+//      Descartar la propuesta NO es terminal acá: la solicitud vuelve al
+//      tablón, porque tiene un solo cupo y no hay tabla de conversaciones.
+//   2. CHAT 24 h DESPUÉS DE FINALIZAR. Antes se borraba en el acto; ahora sigue
+//      abierto —lectura y escritura— 24 horas, y recién entonces se cierra y se
+//      purga. La frontera es la RLS (`cobertura_chat_abierto`); `chatAbierto`
+//      de acá abajo es solo su espejo para la UI.
+//   3. SIN CONTROL DE PAGOS. En este módulo el médico que releva le cobra
+//      directo al tutor, así que no hay pago entre las partes: los RPC
+//      `cobertura_pago_*` se retiraron y `lib/pagos.js` ya no conoce 'cobertura'.
+//
+// Todas las transiciones pasan por RPC: 0034 le quitó al cliente la policy de
+// update sobre `cobertura_solicitudes`.
 //
 // SUPUESTO: no se exige perfiles.estado_validacion = 'validado' para publicar
 // u ofrecerse (no fue especificado en el pedido). Si el fundador quiere
@@ -34,6 +52,60 @@ export const TIPOS_SERVICIO_COBERTURA = [
 export const ESPECIES_COBERTURA = ['Canino', 'Felino', 'Otro'];
 
 export const TEMPERAMENTOS_COBERTURA = ['Tranquilo', 'Nervioso', 'Agresivo', 'Desconocido'];
+
+// Lo que sigue vivo y por tanto no es historial. 'propuesta' entra con 0034.
+export const ESTADOS_ACTIVOS_COBERTURA = ['abierta', 'propuesta', 'cubierta'];
+
+// ¿Sigo pudiendo escribir en el chat? Espejo EXACTO de la función
+// `cobertura_chat_abierto` de 0034 §5, que es la que manda: acá solo evita
+// pintar un composer que el backend va a rechazar.
+export function chatAbierto(solicitud) {
+  if (!solicitud) return false;
+  if (solicitud.estado === 'propuesta' || solicitud.estado === 'cubierta') return true;
+  if (solicitud.estado !== 'finalizada' || !solicitud.chat_cierra_at) return false;
+  return Date.now() < new Date(solicitud.chat_cierra_at).getTime();
+}
+
+// Minutos que le quedan a la ventana de 24 h, para el aviso del chat. Negativo
+// o cero = vencida.
+export function minutosRestantesChat(solicitud) {
+  if (solicitud?.estado !== 'finalizada' || !solicitud.chat_cierra_at) return null;
+  return Math.ceil((new Date(solicitud.chat_cierra_at).getTime() - Date.now()) / 60000);
+}
+
+export function textoVentanaChat(solicitud) {
+  const minutos = minutosRestantesChat(solicitud);
+  if (minutos == null) return '';
+  if (minutos <= 0) return 'El chat de este servicio ya se cerró.';
+  if (minutos < 60) return `El chat se cierra en ${minutos} min.`;
+  return `El chat se cierra en ${Math.floor(minutos / 60)} h.`;
+}
+
+// Mi bandera de acuerdo y la de la otra parte, según de qué lado estoy.
+export function acuerdosCobertura(solicitud, perfilId) {
+  const soyAutor = solicitud?.autor_id === perfilId;
+  return {
+    soyAutor,
+    miAcuerdo: Boolean(soyAutor ? solicitud?.acuerdo_autor : solicitud?.acuerdo_cobertura),
+    suAcuerdo: Boolean(soyAutor ? solicitud?.acuerdo_cobertura : solicitud?.acuerdo_autor),
+  };
+}
+
+// Mismo criterio de zona que filtrarPublicacionesPorZona (lib/relevo.js) y
+// filtrarPorZona (lib/apoyo.js): `zona_cobertura` del perfil es texto con zonas
+// separadas por coma y basta con que la solicitud mencione cualquiera de las
+// mías. Sin zona configurada no se filtra nada.
+export function filtrarSolicitudesPorZona(solicitudes, zonaCobertura) {
+  const zonas = (zonaCobertura ?? '')
+    .split(',')
+    .map((z) => z.trim())
+    .filter(Boolean);
+  if (zonas.length === 0) return solicitudes;
+  return solicitudes.filter((s) => {
+    const zona = (s.zona ?? '').toLowerCase();
+    return zonas.some((z) => zona.includes(z.toLowerCase()));
+  });
+}
 
 async function adjuntarPerfil(filas, campoId, campoSalida) {
   const ids = Array.from(new Set(filas.map((f) => f[campoId]).filter(Boolean)));
@@ -94,12 +166,12 @@ export async function fetchSolicitudesAbiertas(autorId) {
 }
 
 // "Mis Solicitudes": las que publiqué o las que estoy cubriendo, mientras
-// sigan activas (abierta/cubierta) — las terminales van al historial.
+// sigan activas (abierta/propuesta/cubierta) — las terminales van al historial.
 export async function fetchMisSolicitudesActivas(perfilId) {
   const { data, error } = await supabase
     .from('cobertura_solicitudes')
     .select('*')
-    .in('estado', ['abierta', 'cubierta'])
+    .in('estado', ESTADOS_ACTIVOS_COBERTURA)
     .or(`autor_id.eq.${perfilId},medico_cobertura_id.eq.${perfilId}`)
     .order('fecha_servicio', { ascending: true });
   if (error) throw error;
@@ -109,8 +181,8 @@ export async function fetchMisSolicitudesActivas(perfilId) {
 }
 
 // Historial: solicitudes terminales (finalizada/cancelada) donde participé,
-// como autor o como cobertura. Sin ningún dato del chat (ya se borró en
-// cobertura_finalizar_servicio).
+// como autor o como quien relevó. No trae mensajes: el chat de una finalizada
+// vive 24 h más en su propia pantalla y después se purga (0034).
 export async function fetchHistorial(perfilId) {
   const { data, error } = await supabase
     .from('cobertura_solicitudes')
@@ -124,46 +196,79 @@ export async function fetchHistorial(perfilId) {
   return adjuntarPerfil(conAutor, 'medico_cobertura_id', 'cobertura');
 }
 
-// Ofrecerse a cubrir: vía RPC (security definer, ver 0023) para que el
+// Ofrecerse a cubrir: vía RPC (security definer, ver 0023/0034) para que el
 // chequeo "estado='abierta' y no soy el autor" quede resuelto en un único
 // UPDATE atómico en el servidor — evita la condición de carrera de dos
 // médicos ofreciéndose al mismo tiempo (gana quien primero llega; el
 // segundo recibe null y debe refrescar el listado).
+//
+// 0034: esto ya NO cierra el trato. Deja la solicitud en 'propuesta', abre el
+// chat y espera el acuerdo de las dos partes (`acordarCobertura`).
 export async function ofrecerCobertura(solicitudId) {
   const { data, error } = await supabase.rpc('cobertura_ofrecerse', { p_solicitud_id: solicitudId });
   if (error) throw error;
   if (!data) {
-    throw new Error('Esta solicitud ya fue cubierta por otro médico. Actualiza el listado.');
+    throw new Error('Otro médico se te adelantó con esta solicitud. Actualiza el listado.');
   }
   return data;
 }
 
-export async function cancelarSolicitud(id, autorId) {
-  const { error } = await supabase
-    .from('cobertura_solicitudes')
-    .update({ estado: 'cancelada' })
-    .eq('id', id)
-    .eq('autor_id', autorId)
-    .eq('estado', 'abierta');
+// "Estoy de acuerdo" (0034). Cada lado marca solo SU bandera; el paso a
+// 'cubierta' lo deriva el RPC de las dos. Un acuerdo dado no se retira: si
+// cambiaste de idea, `descartarPropuesta`.
+export async function acordarCobertura(solicitudId) {
+  const { data, error } = await supabase.rpc('cobertura_acordar', { p_solicitud_id: solicitudId });
+  if (error) throw error;
+  return data;
+}
+
+// Deshacer la propuesta (0034). La puede tomar cualquiera de los dos y NO es
+// terminal: la solicitud vuelve al tablón para que otro médico se ofrezca.
+//
+// El RPC borra los mensajes de esa negociación y devuelve los paths de sus
+// adjuntos; los archivos hay que quitarlos acá porque Supabase no admite
+// DELETE por SQL sobre storage.objects (ver la cabecera de 0023). Que falle el
+// borrado en Storage no revierte nada: las filas ya no existen y los objetos
+// quedan huérfanos e ilegibles, así que no se propaga el error.
+export async function descartarPropuesta(solicitudId) {
+  const { data, error } = await supabase.rpc('cobertura_descartar_propuesta', {
+    p_solicitud_id: solicitudId,
+  });
+  if (error) throw error;
+  await borrarAdjuntos(data);
+}
+
+export async function cancelarSolicitud(id) {
+  const { error } = await supabase.rpc('cobertura_cancelar', { p_solicitud_id: id });
   if (error) throw error;
 }
 
-// Finalizar el servicio: borra primero los archivos adjuntos vía la Storage
-// API real (Supabase no permite DELETE directo por SQL sobre storage.objects,
-// ni siquiera desde una función security definer — ver 0023) mientras la
-// solicitud sigue 'cubierta', y luego llama al RPC que borra los mensajes y
-// cierra la solicitud. "Sin historial del chat" es un borrado real, no un
-// filtro de UI.
+// Finalizar el servicio (0034). Ya no borra nada: sella el cierre y abre la
+// ventana de 24 h durante la cual el chat sigue admitiendo mensajes. El
+// borrado ocurre después, en `purgarChatsVencidos`.
 export async function finalizarServicio(solicitudId) {
-  const mensajes = await fetchMensajesChat(solicitudId);
-  const paths = mensajes.map((m) => m.archivo_path).filter(Boolean);
-  if (paths.length > 0) {
-    const { error: storageError } = await supabase.storage.from('cobertura-chat').remove(paths);
-    if (storageError) throw storageError;
-  }
-
   const { error } = await supabase.rpc('cobertura_finalizar_servicio', { p_solicitud_id: solicitudId });
   if (error) throw error;
+}
+
+// Purga perezosa de los chats cuya ventana de 24 h ya venció (0034 §4.6).
+// Best-effort, igual que `expirarSolicitudesVencidas` en lib/solicitudes.js: la
+// llaman las pantallas del módulo al abrirse, y que nadie la llame NO reabre
+// ningún chat — la ventana la cierra la RLS.
+export async function purgarChatsVencidos() {
+  const { data, error } = await supabase.rpc('cobertura_purgar_chats_vencidos');
+  if (error) throw error;
+  await borrarAdjuntos(data);
+}
+
+// El RPC devuelve `setof text`, que llega como array de strings o como array de
+// objetos de una sola columna según la versión de PostgREST; se aceptan las dos.
+async function borrarAdjuntos(filas) {
+  const paths = (filas ?? [])
+    .map((f) => (typeof f === 'string' ? f : f?.cobertura_purgar_chats_vencidos ?? f?.cobertura_descartar_propuesta))
+    .filter(Boolean);
+  if (paths.length === 0) return;
+  await supabase.storage.from('cobertura-chat').remove(paths);
 }
 
 export async function fetchSolicitud(id) {
@@ -262,6 +367,51 @@ export function subscribeSolicitud(solicitudId, onCambio) {
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+// ============================================================================
+// Punto de encuentro (tabla lateral, D-064) — migración 0032
+// ============================================================================
+// Lo escribe el AUTOR de la solicitud (el médico que pasa el servicio: es quien
+// sabe dónde es) y el que cubre solo lo lee una vez tomó el servicio. El
+// control es de backend: la policy de select de `cobertura_direccion` devuelve
+// cero filas antes de 'cubierta', así que acá no hay ningún chequeo de estado —
+// si no se puede ver, llega null. Mismo criterio que `apoyo_direccion` (0028).
+//
+// A diferencia del chat, esto SOBREVIVE a la finalización: el servicio se
+// prestó en algún lado y ese dato sigue en el historial (N-9) cuando los
+// mensajes ya se borraron.
+
+export async function fetchDireccionCobertura(solicitudId) {
+  const { data, error } = await supabase
+    .from('cobertura_direccion')
+    .select('*')
+    .eq('solicitud_id', solicitudId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function guardarDireccionCobertura({ solicitudId, direccion, referencia, linkMaps }) {
+  const texto = (direccion ?? '').trim();
+  if (!texto) throw new Error('Escribe la dirección del punto de encuentro.');
+
+  const { data, error } = await supabase
+    .from('cobertura_direccion')
+    .upsert(
+      {
+        solicitud_id: solicitudId,
+        direccion_encuentro: texto,
+        referencia: referencia?.trim() || null,
+        link_maps: linkMaps?.trim() || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'solicitud_id' },
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export function formatFechaHoraServicio(solicitud) {

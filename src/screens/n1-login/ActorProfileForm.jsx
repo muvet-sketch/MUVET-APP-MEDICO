@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Button, Input } from '../../components/ui';
+import { Button, Input, Select } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { uploadDocumento } from '../../lib/storage';
 import { verificarMatriculaComvezcol } from '../../lib/verificacionComvezcol';
+import { ZONAS_COBERTURA } from '../../lib/municipios';
+import { crearSede } from '../../lib/clinicaSedes';
 
 const ROLES = [
   { value: 'medico', label: 'Médico Veterinario' },
@@ -21,6 +23,11 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
   const [razonSocial, setRazonSocial] = useState('');
   const [nit, setNit] = useState('');
   const [direccionSede, setDireccionSede] = useState('');
+  // 0030: la ciudad de la clínica es lo que alimenta el filtro de cercanía de
+  // MUVET Turnos. Se pide desde el registro para que la primera oferta ya salga
+  // visible; antes `zona_cobertura` quedaba NULL para clínicas y sus ofertas no
+  // aparecían en ninguna búsqueda.
+  const [ciudadClinica, setCiudadClinica] = useState('');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,6 +42,10 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
     }
     if (rol === 'medico' && !matriculaComvezcol) {
       setError('La matrícula COMVEZCOL es obligatoria para médicos.');
+      return;
+    }
+    if (rol === 'clinica' && !ciudadClinica) {
+      setError('Selecciona la ciudad de tu sede para que tus ofertas aparezcan en las búsquedas.');
       return;
     }
 
@@ -53,7 +64,10 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
         rol,
         nombre_completo: nombreCompleto,
         telefono,
-        zona_cobertura: rol !== 'clinica' ? zonaCobertura : null,
+        // 0030: la clínica ya NO va con `zona_cobertura` en null. Su ciudad
+        // también es su zona de búsqueda — es lo que hace que vea las ofertas
+        // de médicos y auxiliares cercanos, igual que ellos ven las suyas.
+        zona_cobertura: rol === 'clinica' ? ciudadClinica || null : zonaCobertura,
         especialidad: rol === 'medico' ? especialidad : null,
         // trim: la detección de matrícula duplicada compara el valor exacto,
         // así que un espacio de sobra la esquivaría.
@@ -67,6 +81,18 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
 
       const { error: insertError } = await supabase.from('perfiles').insert(perfilRow);
       if (insertError) throw insertError;
+
+      // La sede principal queda creada de entrada (0030), para que la clínica
+      // pueda publicar sin pasar antes por su perfil. Las demás sedes se
+      // agregan desde N-29.
+      if (rol === 'clinica') {
+        await crearSede({
+          clinicaId: userId,
+          etiqueta: 'Sede principal',
+          ciudad: ciudadClinica,
+          direccion: direccionSede,
+        });
+      }
 
       // Verificación automática contra el registro público del Consejo. Va en
       // su propio try/catch a propósito: el perfil ya quedó creado en
@@ -116,6 +142,14 @@ export default function ActorProfileForm({ userId, onProfileCreated }) {
         <>
           <Input label="Razón social" required value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} />
           <Input label="NIT" required value={nit} onChange={(e) => setNit(e.target.value)} />
+          <Select
+            label="Ciudad de la sede"
+            value={ciudadClinica}
+            onChange={(e) => setCiudadClinica(e.target.value)}
+            options={ZONAS_COBERTURA}
+            placeholder="Selecciona la ciudad"
+            hint="Determina qué médicos y auxiliares ven tus ofertas. Los de municipios vecinos también las verán."
+          />
           <Input
             label="Dirección de la sede"
             required

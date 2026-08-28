@@ -487,10 +487,20 @@ export async function guardarDireccionEncuentro({ conversacionId, direccion, ref
   return data;
 }
 
-// Deep link a la app de mapas nativa, mismo criterio que D-536 en N-4: no hay
-// mapa interno ni GPS, solo se abre la app del dispositivo con la dirección.
-export function mapsUrl(direccion) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion ?? '')}`;
+// Deep link a la app de mapas nativa (D-536). Se mudó a lib/mapas.js cuando
+// dejó de ser exclusivo de este módulo (Home, N-30 y N-9 también lo usan); se
+// re-exporta para no romper a quien ya lo importaba desde acá.
+export { mapsUrl } from './mapas';
+
+// El auxiliar no se enteraba de que la dirección había aparecido: la escribe el
+// médico DESPUÉS del acuerdo, `apoyo_direccion` está fuera de Realtime (0028
+// §C.4) y la pantalla solo la volvía a pedir cuando cambiaba `estado` — que ya
+// no se mueve. 0031 agrega el latido `direccion_actualizada_at` en la fila de
+// la conversación, que sí está publicada, para poder reaccionar a la escritura
+// y a cada edición posterior. El dato en sí sigue viajando solo por PostgREST,
+// donde manda la policy de select.
+export function direccionActualizadaAt(conversacion) {
+  return conversacion?.direccion_actualizada_at ?? null;
 }
 
 // ============================================================================

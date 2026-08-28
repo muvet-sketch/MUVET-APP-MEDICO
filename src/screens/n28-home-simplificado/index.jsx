@@ -1,16 +1,23 @@
-// N-28 · Home Auxiliar/Clínica (Fase 7). Dashboard simplificado: solo MUVET
-// Turnos + perfil — sin ningún rastro de flujo clínico ni Constelación (D-543).
+// N-28 · Home Auxiliar/Clínica (Fase 7). Dashboard simplificado: módulos
+// gremiales + perfil — sin ningún rastro de flujo clínico ni Constelación
+// (D-543).
 //
-// Mismo orden que la Home del médico (N-2): módulo → ofertas recientes →
+// Mismo orden que la Home del médico (N-2): módulos → lo mío → tablones →
 // historial. El botón "👤 Mi perfil" que había aquí desapareció: el perfil se
 // alcanza por la pestaña de la barra inferior en los dos roles.
+//
+// El auxiliar participa en DOS módulos (MUVET Turnos y MUVET Auxiliar) y la
+// clínica solo en uno, así que todo lo de /apoyo va tras `!esClinica`.
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { fetchMisPublicaciones, fetchMisConversaciones } from '../../lib/relevo';
-import { CORTO_TURNOS, NOMBRE_TURNOS } from '../../lib/nombresModulos';
+import { fetchMisPublicacionesApoyo, fetchMisConversacionesApoyo } from '../../lib/apoyo';
+import { CORTO_AUXILIAR, CORTO_TURNOS, NOMBRE_AUXILIAR, NOMBRE_TURNOS } from '../../lib/nombresModulos';
 import { Card, Button, BottomNav, NotificationBell, AppMenu } from '../../components/ui';
 import OfertasRecientes from '../../components/home/OfertasRecientes';
+import ApoyoDisponibles from '../../components/home/ApoyoDisponibles';
+import MisPublicaciones from '../../components/home/MisPublicaciones';
 import HistorialReciente from '../../components/home/HistorialReciente';
 import ServiciosAceptados from '../../components/home/ServiciosAceptados';
 import PerfilAuxiliarInline from './PerfilAuxiliarInline';
@@ -21,8 +28,15 @@ export default function N28HomeSimplificado() {
   const { perfil } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [publicaciones, setPublicaciones] = useState([]);
-  const [conversacionesAbiertas, setConversacionesAbiertas] = useState(0);
+  // Contadores del subtítulo de cada tarjeta de módulo. El listado de "Mis
+  // publicaciones" ya no sale de acá: lo trae su propio componente, que además
+  // cubre los tres módulos y deja activar/pausar desde la Home.
+  const [contadores, setContadores] = useState({
+    turnosPubs: 0,
+    turnosConversaciones: 0,
+    apoyoPubs: 0,
+    apoyoConversaciones: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   // El panel de perfil del auxiliar se abre y se cierra desde la URL, no desde
@@ -33,14 +47,30 @@ export default function N28HomeSimplificado() {
   const mostrarPerfil = searchParams.get('perfil') === '1';
 
   useEffect(() => {
-    if (!perfil?.id) return;
+    if (!perfil?.id) return undefined;
     let active = true;
-    Promise.all([fetchMisPublicaciones(perfil.id), fetchMisConversaciones(perfil.id)])
-      .then(([pubs, conversaciones]) => {
+    const esAuxiliar = perfil.rol === 'auxiliar';
+    const vacio = Promise.resolve([]);
+
+    // allSettled: que falle MUVET Auxiliar no debe dejar en blanco los
+    // contadores de MUVET Turnos, ni al revés.
+    Promise.allSettled([
+      fetchMisPublicaciones(perfil.id),
+      fetchMisConversaciones(perfil.id),
+      esAuxiliar ? fetchMisPublicacionesApoyo(perfil.id) : vacio,
+      esAuxiliar ? fetchMisConversacionesApoyo(perfil.id) : vacio,
+    ])
+      .then(([turnosPubs, turnosConv, apoyoPubs, apoyoConv]) => {
         if (!active) return;
-        setPublicaciones(pubs.filter((p) => p.activa));
+        const filas = (r) => (r.status === 'fulfilled' ? r.value ?? [] : []);
         // Solo las vivas: una negociación cerrada ya no es algo que atender.
-        setConversacionesAbiertas(conversaciones.filter((c) => c.estado === 'abierta').length);
+        const abiertas = (cs) => cs.filter((c) => c.estado === 'abierta').length;
+        setContadores({
+          turnosPubs: filas(turnosPubs).filter((p) => p.activa).length,
+          turnosConversaciones: abiertas(filas(turnosConv)),
+          apoyoPubs: filas(apoyoPubs).filter((p) => p.activa && p.estado === 'abierta').length,
+          apoyoConversaciones: abiertas(filas(apoyoConv)),
+        });
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -48,7 +78,7 @@ export default function N28HomeSimplificado() {
     return () => {
       active = false;
     };
-  }, [perfil?.id]);
+  }, [perfil?.id, perfil?.rol]);
 
   if (!perfil) return null;
 
@@ -75,7 +105,7 @@ export default function N28HomeSimplificado() {
           <p className="text-[12px] text-[#5A6B7A]">
             {loading
               ? 'Cargando…'
-              : `${publicaciones.length} publicación(es) activa(s) · ${conversacionesAbiertas} conversación(es) abierta(s)`}
+              : `${contadores.turnosPubs} publicación(es) activa(s) · ${contadores.turnosConversaciones} conversación(es) abierta(s)`}
           </p>
         </div>
         <Button variant="outline" fullWidth={false} onClick={() => navigate('/relevo')}>
@@ -83,26 +113,40 @@ export default function N28HomeSimplificado() {
         </Button>
       </Card>
 
+      {/* El segundo módulo del auxiliar. Hasta ahora solo se alcanzaba por la
+          barra inferior. La clínica no participa (es médico↔auxiliar). */}
+      {!esClinica && (
+        <Card className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[14px] font-semibold text-[#0A1628]">{NOMBRE_AUXILIAR}</p>
+            <p className="text-[12px] text-[#5A6B7A]">
+              {loading
+                ? 'Cargando…'
+                : `${contadores.apoyoPubs} publicación(es) activa(s) · ${contadores.apoyoConversaciones} conversación(es) abierta(s)`}
+            </p>
+          </div>
+          <Button variant="outline" fullWidth={false} onClick={() => navigate('/apoyo')}>
+            {`Ir a ${CORTO_AUXILIAR}`}
+          </Button>
+        </Card>
+      )}
+
       {/* Lo acordado que sigue en curso: con quién, dónde, y la puerta al
           chat (0028). El auxiliar ve Turnos + Auxiliar; la clínica solo
           Turnos, que es el único módulo en el que participa. */}
       <ServiciosAceptados perfil={perfil} />
 
+      {/* Sustituye al antiguo bloque plano "Mis publicaciones activas", que
+          solo listaba MUVET Turnos, mostraba descripción y zona y no dejaba
+          hacer nada. Ahora cubre los dos módulos del auxiliar y permite
+          activar o pausar sin salir del Home. */}
+      <MisPublicaciones perfil={perfil} />
+
       <OfertasRecientes perfil={perfil} />
 
-      <HistorialReciente perfil={perfil} />
+      {!esClinica && <ApoyoDisponibles perfil={perfil} />}
 
-      {!loading && publicaciones.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[12px] font-semibold text-[#5A6B7A]">Mis publicaciones activas</p>
-          {publicaciones.map((p) => (
-            <Card key={p.id} className="flex flex-col gap-1">
-              <p className="text-[13px] font-medium text-[#0A1628]">{p.descripcion || '(sin descripción)'}</p>
-              <p className="text-[12px] text-[#5A6B7A]">{p.zona || 'Sin zona'}</p>
-            </Card>
-          ))}
-        </div>
-      )}
+      <HistorialReciente perfil={perfil} />
 
       {!esClinica && mostrarPerfil && (
         <>

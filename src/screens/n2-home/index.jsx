@@ -11,6 +11,9 @@ import {
 import ValidationBadge from './ValidationBadge';
 import QuickAccess from './QuickAccess';
 import OfertasRecientes from '../../components/home/OfertasRecientes';
+import ApoyoDisponibles from '../../components/home/ApoyoDisponibles';
+import RelevosDisponibles from '../../components/home/RelevosDisponibles';
+import MisPublicaciones from '../../components/home/MisPublicaciones';
 import HistorialReciente from '../../components/home/HistorialReciente';
 import ServiciosAceptados from '../../components/home/ServiciosAceptados';
 import { Card, Button, Toast, BottomNav, NotificationBell, AppMenu } from '../../components/ui';
@@ -141,17 +144,26 @@ export default function N2Home() {
         </Card>
       )}
 
-      <QuickAccess disponible={perfil.disponible} servicioActivo={servicioActivo} />
+      <QuickAccess />
 
       {/* Lo acordado en MUVET Turnos y MUVET Auxiliar que sigue en curso: con
           quién, dónde, y la puerta al chat (0028). */}
       <ServiciosAceptados perfil={perfil} />
 
+      {/* Lo propio antes que lo ajeno: lo que YO tengo publicado en los tres
+          módulos, con el interruptor de publicada/pausada acá mismo. */}
+      <MisPublicaciones perfil={perfil} mostrarToast={mostrarToast} />
+
       {/* "Actividad reciente" (mock) se movió a N-27 · Mis Domicilios, que es
-          su módulo real. Este espacio lo ocupan ahora las ofertas de MUVET
-          Turnos abiertas, que sí son accionables desde la Home, y debajo la
-          vista previa del historial único. Mismo orden en N-28. */}
+          su módulo real. Este espacio lo ocupan ahora los TRES tablones
+          abiertos —Turnos, Relevo y Auxiliar—, que sí son accionables desde la
+          Home, y al fondo la vista previa del historial único. N-28 lleva el
+          mismo orden, menos Relevo: ese módulo es solo médico↔médico. */}
       <OfertasRecientes perfil={perfil} />
+
+      <RelevosDisponibles perfil={perfil} />
+
+      <ApoyoDisponibles perfil={perfil} />
 
       <HistorialReciente perfil={perfil} />
 

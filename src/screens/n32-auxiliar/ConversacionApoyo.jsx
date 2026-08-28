@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
-import { ScreenHeader, Card, Badge, Button, Modal, Toast } from '../../components/ui';
+import { ScreenHeader, Card, Badge, Button, Modal, Toast, BottomNav } from '../../components/ui';
 import BurbujasMensajes from '../../components/chat/BurbujasMensajes';
 import PanelPagoServicio from '../../components/PanelPagoServicio';
 import DireccionEncuentro from './DireccionEncuentro';
@@ -118,8 +118,17 @@ export default function ConversacionApoyo() {
     marcarConversacionApoyoLeida(conversacion, perfil.id).catch(() => {});
   }, [conversacion?.id, perfil?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // La dirección se vuelve a pedir cuando cambia el estado: es exactamente el
-  // momento en que el backend empieza (o deja) de devolvérsela al auxiliar.
+  // La dirección se vuelve a pedir por dos motivos distintos:
+  //
+  //   `estado`                     → es cuando el backend empieza (o deja) de
+  //                                  devolvérsela al auxiliar.
+  //   `direccion_actualizada_at`   → el latido de 0031: el médico la escribió o
+  //                                  la editó. Sin esto, una dirección puesta
+  //                                  DESPUÉS del acuerdo no le llegaba nunca al
+  //                                  auxiliar, porque el estado ya no se movía.
+  //
+  // El latido llega por la suscripción a la fila de la conversación, que ya
+  // existía. La dirección en sí nunca viaja por websocket.
   useEffect(() => {
     if (!conversacion?.id) return undefined;
     let activo = true;
@@ -133,7 +142,7 @@ export default function ConversacionApoyo() {
     return () => {
       activo = false;
     };
-  }, [conversacion?.id, conversacion?.estado]);
+  }, [conversacion?.id, conversacion?.estado, conversacion?.direccion_actualizada_at]);
 
   useEffect(() => {
     const otroId = conversacion?.otro?.id;
@@ -232,16 +241,17 @@ export default function ConversacionApoyo() {
 
   if (loading) {
     return (
-      <div className="flex min-h-svh flex-col">
+      <div className="flex min-h-svh flex-col pb-16">
         <ScreenHeader title="Conversación" fallbackTo="/apoyo?tab=conversaciones" />
         <p className="px-5 py-5 text-[12px] text-[#5A6B7A]">Cargando…</p>
+        <BottomNav />
       </div>
     );
   }
 
   if (!conversacion) {
     return (
-      <div className="flex min-h-svh flex-col">
+      <div className="flex min-h-svh flex-col pb-16">
         <ScreenHeader title="Conversación" fallbackTo="/apoyo?tab=conversaciones" />
         <div className="px-5 py-5">
           <Card className="text-center text-[13px] text-[#5A6B7A]">
@@ -251,6 +261,7 @@ export default function ConversacionApoyo() {
             Volver a mis conversaciones
           </Button>
         </div>
+        <BottomNav />
       </div>
     );
   }
@@ -269,7 +280,9 @@ export default function ConversacionApoyo() {
   const franja = formatFranjaApoyo(publicacion);
 
   return (
-    <div className="flex min-h-svh flex-col">
+    // pb-16 reserva el alto de la barra inferior, que es `fixed`: sin él el
+    // último bloque quedaría debajo de ella.
+    <div className="flex min-h-svh flex-col pb-16">
       <ScreenHeader title={nombreOtro} fallbackTo="/apoyo?tab=conversaciones" conCampana />
 
       <div className="flex flex-col gap-3 px-5 py-4">
@@ -309,6 +322,7 @@ export default function ConversacionApoyo() {
             conversacionId={conversacion.id}
             direccion={direccion}
             soyElMedico={soyElMedico}
+            acordada={aceptada || conversacion.estado === 'finalizada'}
             editable={puedeEscribir}
             onGuardada={setDireccion}
             showToast={showToast}
@@ -338,7 +352,7 @@ export default function ConversacionApoyo() {
       />
 
       {puedeEscribir && (
-        <div className="sticky bottom-0 flex flex-col gap-2 border-t border-[#E1E8ED] bg-white px-5 py-3">
+        <div className="sticky bottom-16 flex flex-col gap-2 border-t border-[#E1E8ED] bg-white px-5 py-3">
           {abierta && (
             <p className="text-[11px] text-[#5A6B7A]">
               Tú: <span className="font-medium text-[#0A1628]">{miAcuerdo ? '✓ de acuerdo' : 'sin confirmar'}</span> ·{' '}
@@ -415,7 +429,7 @@ export default function ConversacionApoyo() {
       )}
 
       {conversacion.estado === 'finalizada' && (
-        <div className="sticky bottom-0 border-t border-[#E1E8ED] bg-white px-5 py-3">
+        <div className="sticky bottom-16 border-t border-[#E1E8ED] bg-white px-5 py-3">
           <p className="text-[13px] font-medium text-[#0A1628]">🏁 Servicio finalizado.</p>
           <p className="mt-1 text-[11px] text-[#5A6B7A]">
             El chat quedó cerrado a mensajes nuevos, pero el historial se conserva acá.
@@ -424,7 +438,7 @@ export default function ConversacionApoyo() {
       )}
 
       {conversacion.estado === 'descartada' && (
-        <div className="sticky bottom-0 border-t border-[#E1E8ED] bg-white px-5 py-3">
+        <div className="sticky bottom-16 border-t border-[#E1E8ED] bg-white px-5 py-3">
           <p className="text-[13px] font-medium text-[#C63B3B]">
             {conversacion.descartada_por === perfil.id
               ? 'Descartaste esta conversación.'
@@ -464,6 +478,7 @@ export default function ConversacionApoyo() {
       </Modal>
 
       <Toast message={toast.message} tone={toast.tone} visible={toast.visible} />
+      <BottomNav />
     </div>
   );
 }

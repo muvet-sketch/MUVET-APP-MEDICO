@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
-import { ScreenHeader, Card, Badge, Button, Modal, Toast } from '../../components/ui';
+import { ScreenHeader, Card, Badge, Button, Modal, Toast, BottomNav, Avatar } from '../../components/ui';
 import { formatCOP, formatFechaCorta } from '../../lib/format';
 import {
   fetchConversacion,
@@ -230,16 +230,17 @@ export default function ConversacionRelevo() {
 
   if (loading) {
     return (
-      <div className="flex min-h-svh flex-col">
+      <div className="flex min-h-svh flex-col pb-16">
         <ScreenHeader title="Conversación" fallbackTo="/relevo?tab=mensajes" />
         <p className="px-5 py-5 text-[12px] text-[#5A6B7A]">Cargando…</p>
+        <BottomNav />
       </div>
     );
   }
 
   if (!conversacion) {
     return (
-      <div className="flex min-h-svh flex-col">
+      <div className="flex min-h-svh flex-col pb-16">
         <ScreenHeader title="Conversación" fallbackTo="/relevo?tab=mensajes" />
         <div className="px-5 py-5">
           <Card className="text-center text-[12px] text-[#5A6B7A]">
@@ -249,6 +250,7 @@ export default function ConversacionRelevo() {
             Volver a mis conversaciones
           </Button>
         </div>
+        <BottomNav />
       </div>
     );
   }
@@ -266,13 +268,18 @@ export default function ConversacionRelevo() {
   const franja = formatFranjaHoraria(publicacion);
 
   return (
-    <div className="flex min-h-svh flex-col">
+    // pb-16 reserva el alto de la barra inferior, que es `fixed`: sin él el
+    // último bloque quedaría debajo de ella.
+    <div className="flex min-h-svh flex-col pb-16">
       <ScreenHeader title={nombreOtro} fallbackTo="/relevo?tab=mensajes" conCampana />
 
       <div className="flex flex-col gap-3 px-5 py-4">
         <Card className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[14px] font-semibold text-[#0A1628]">{nombreOtro}</p>
+            <div className="flex items-center gap-2">
+              <Avatar fotoUrl={conversacion.otro?.foto_url} nombre={nombreOtro} size={36} />
+              <p className="text-[14px] font-semibold text-[#0A1628]">{nombreOtro}</p>
+            </div>
             <Badge tone={estadoBadge.tone}>{estadoBadge.label}</Badge>
           </div>
           <p className="text-[11px] text-[#5A6B7A]">{ACTOR_LABEL[conversacion.otro?.rol] ?? ''}</p>
@@ -331,7 +338,7 @@ export default function ConversacionRelevo() {
           acepta la oferta". El estado lo deriva el trigger de 0027 de las dos
           banderas — acá solo se marca la propia. */}
       {puedeEscribir && (
-        <div className="sticky bottom-0 flex flex-col gap-2 border-t border-[#E1E8ED] bg-white px-5 py-3">
+        <div className="sticky bottom-16 flex flex-col gap-2 border-t border-[#E1E8ED] bg-white px-5 py-3">
           {abierta && (
             <p className="text-[11px] text-[#5A6B7A]">
               Tú: <span className="font-medium text-[#0A1628]">{miAcuerdo ? '✓ de acuerdo' : 'sin confirmar'}</span> ·{' '}
@@ -390,7 +397,7 @@ export default function ConversacionRelevo() {
       )}
 
       {conversacion.estado === 'finalizada' && (
-        <div className="sticky bottom-0 border-t border-[#E1E8ED] bg-white px-5 py-3">
+        <div className="sticky bottom-16 border-t border-[#E1E8ED] bg-white px-5 py-3">
           <p className="text-[13px] font-medium text-[#0A1628]">🏁 Turno finalizado.</p>
           <p className="mt-1 text-[11px] text-[#5A6B7A]">
             El chat quedó cerrado a mensajes nuevos, pero el historial se conserva acá.
@@ -399,7 +406,7 @@ export default function ConversacionRelevo() {
       )}
 
       {conversacion.estado === 'descartada' && (
-        <div className="sticky bottom-0 border-t border-[#E1E8ED] bg-white px-5 py-3">
+        <div className="sticky bottom-16 border-t border-[#E1E8ED] bg-white px-5 py-3">
           <p className="text-[13px] font-medium text-[#C63B3B]">
             {conversacion.descartada_por === perfil.id
               ? 'Descartaste esta conversación.'
@@ -440,6 +447,7 @@ export default function ConversacionRelevo() {
       </Modal>
 
       <Toast message={toast.message} tone={toast.tone} visible={toast.visible} />
+      <BottomNav />
     </div>
   );
 }

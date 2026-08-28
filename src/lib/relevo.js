@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { subscribeInserts, subscribeRow } from './chatRealtime';
+import { mismaAreaOCiudad } from './municipios';
 
 // N-26 · MUVET Turnos (D-540/D-545/D-546). Capa de acceso a datos, siguiendo
 // el patrón de lib/solicitudes.js y lib/coberturaServicio.js.
@@ -76,7 +77,13 @@ async function adjuntarAutores(filas, campoId, campoSalida = 'autor') {
   const ids = Array.from(new Set(filas.map((f) => f[campoId]).filter(Boolean)));
   if (ids.length === 0) return filas.map((f) => ({ ...f, [campoSalida]: null }));
 
-  const { data: autores, error } = await supabase.from('perfiles_publico').select('id, rol, nombre_completo, razon_social').in('id', ids);
+  // `foto_url` lo expone `perfiles_publico` solo para perfiles de rol 'clinica'
+  // (migración 0035); para médicos y auxiliares llega null. Es el logo que se
+  // pinta junto al nombre de la clínica en las pantallas de MUVET Turnos.
+  const { data: autores, error } = await supabase
+    .from('perfiles_publico')
+    .select('id, rol, nombre_completo, razon_social, foto_url')
+    .in('id', ids);
   if (error) throw error;
 
   const porId = new Map((autores ?? []).map((a) => [a.id, a]));
@@ -117,24 +124,51 @@ export async function fetchPublicacionesActivas({ tipo, rolObjetivo, paraRol, zo
 // y el bloque "Ofertas recientes" de la Home (N-2) — así la Home nunca muestra
 // una oferta que luego no aparezca en /relevo. `zona_cobertura` es una sola
 // columna de texto con las zonas separadas por coma (ver parseZonas en
-// lib/municipios.js), y `relevo_publicaciones.zona` se serializa igual, así
-// que se compara por substring: basta con que la publicación mencione
-// cualquiera de mis zonas. Sin zona configurada no se filtra nada.
+// lib/municipios.js), y `relevo_publicaciones.zona` se serializa igual.
+//
+// 0030 cambia el criterio de comparación. Antes era substring, y eso fallaba
+// por los dos lados:
+//
+//   · Demasiado ESTRECHO entre municipios vecinos: un médico en Envigado no
+//     veía una oferta en Bello, aunque estén a quince minutos.
+//   · Demasiado LAXO y a la vez inútil con las clínicas: su `zona` era la
+//     dirección de calle del establecimiento, que nunca contiene el nombre de
+//     una zona del catálogo, así que sus ofertas no le aparecían a nadie.
+//
+// Ahora la ciudad de la oferta sale de la sede elegida (catálogo cerrado) y la
+// comparación es `mismaAreaOCiudad`: misma ciudad o misma área metropolitana.
+// Sin zona configurada se sigue sin filtrar nada.
 //
 // SUPUESTO: se hace el split a mano en vez de usar parseZonas() porque este
 // filtro no debe descartar zonas fuera del catálogo — las publicaciones
-// anteriores al catálogo cerrado (0015) tienen `zona` de texto libre y
-// seguirían siendo visibles como hasta ahora.
+// anteriores al catálogo cerrado (0015) tienen `zona` de texto libre. Para
+// ellas se conserva el substring como respaldo, así que siguen visibles como
+// hasta ahora en vez de desaparecer con esta migración.
+export function zonaCoincide(zonaPublicacion, zonasPerfil) {
+  if (!zonasPerfil || zonasPerfil.length === 0) return true;
+  const zonasDeLaOferta = (zonaPublicacion ?? '')
+    .split(',')
+    .map((z) => z.trim())
+    .filter(Boolean);
+  if (zonasDeLaOferta.length === 0) return false;
+
+  return zonasPerfil.some((mia) =>
+    zonasDeLaOferta.some(
+      (suya) =>
+        mismaAreaOCiudad(mia, suya) ||
+        // Respaldo para las `zona` de texto libre previas al catálogo.
+        suya.toLowerCase().includes(mia.toLowerCase()),
+    ),
+  );
+}
+
 export function filtrarPublicacionesPorZona(publicaciones, zonaCobertura) {
   const zonas = (zonaCobertura ?? '')
     .split(',')
     .map((z) => z.trim())
     .filter(Boolean);
   if (zonas.length === 0) return publicaciones;
-  return publicaciones.filter((p) => {
-    const zonaPublicacion = (p.zona ?? '').toLowerCase();
-    return zonas.some((z) => zonaPublicacion.includes(z.toLowerCase()));
-  });
+  return publicaciones.filter((p) => zonaCoincide(p.zona, zonas));
 }
 
 export async function fetchMisPublicaciones(autorId) {
@@ -154,6 +188,7 @@ export async function crearPublicacion({
   rolObjetivo,
   descripcion,
   zona,
+  sedeId,
   fechaInicio,
   fechaFin,
   tipoJornada,
@@ -181,7 +216,11 @@ export async function crearPublicacion({
       tipo,
       rol_objetivo: rolObjetivo,
       descripcion: descripcion || null,
+      // `zona` es la ciudad de la sede (0030): un valor del catálogo, que es lo
+      // que el filtro de cercanía sabe comparar. `sede_id` guarda de qué sede
+      // salió, para poder revelar su dirección exacta tras el acuerdo.
       zona: zona || null,
+      sede_id: sedeId || null,
       fecha_inicio: fechaInicio || null,
       fecha_fin: fechaFin || null,
       tipo_jornada: tipoJornada || null,
@@ -321,6 +360,7 @@ export async function actualizarPublicacion(
   {
     descripcion,
     zona,
+    sedeId,
     fechaInicio,
     fechaFin,
     tipoJornada,
@@ -341,6 +381,7 @@ export async function actualizarPublicacion(
     .update({
       descripcion: descripcion || null,
       zona: zona || null,
+      sede_id: sedeId || null,
       fecha_inicio: fechaInicio || null,
       fecha_fin: fechaFin || null,
       tipo_jornada: tipoJornada || null,
@@ -640,6 +681,12 @@ export function tieneNoLeidos(conversacion, perfilId) {
 // Toda la comunicación va por el chat, que ahora sobrevive al acuerdo. Lo que
 // sigue revelándose tras el acuerdo (o la finalización) es `direccion_sede`,
 // la ubicación del establecimiento de la clínica — mismo criterio que D-064.
+//
+// 0030: esa dirección ya no sale del perfil sino de la SEDE que eligió la
+// oferta (`clinica_sedes` vía `relevo_publicaciones.sede_id`), y vienen dos
+// campos más — `sede_etiqueta` y `sede_link_maps` — para poder decir "Sede
+// Norte" y abrir el link de mapas que pegó la propia clínica. Si la oferta no
+// tiene sede (filas anteriores a 0030) se cae al `direccion_sede` del perfil.
 //
 // Si no hay ninguna relación devuelve null y la UI cae de vuelta a los datos
 // básicos (nombre, rol) que ya trae `otro`.

@@ -3,7 +3,9 @@ import { formatFechaHoraServicio } from '../../lib/coberturaServicio';
 
 const ESTADO_BADGE = {
   abierta: { label: 'Abierta', tone: 'alert' },
-  cubierta: { label: 'Cubierta · servicio en curso', tone: 'ok' },
+  // 0034: alguien se ofreció y falta que las dos partes confirmen.
+  propuesta: { label: 'Por confirmar', tone: 'info' },
+  cubierta: { label: 'Confirmada · servicio en curso', tone: 'ok' },
   finalizada: { label: 'Finalizada', tone: 'ok' },
   cancelada: { label: 'Cancelada', tone: 'critical' },
 };
@@ -33,7 +35,26 @@ export default function SolicitudCard({ solicitud, children }) {
       {solicitud.descripcion && <p className="text-[13px] text-[#0A1628]">{solicitud.descripcion}</p>}
 
       {solicitud.autor && <p className="text-[12px] text-[#5A6B7A]">Solicita: {solicitud.autor.nombre_completo}</p>}
-      {solicitud.cobertura && <p className="text-[12px] text-[#5A6B7A]">Cubre: {solicitud.cobertura.nombre_completo}</p>}
+      {solicitud.cobertura && (
+        <p className="text-[12px] text-[#5A6B7A]">
+          {solicitud.estado === 'propuesta' ? 'Se ofreció: ' : 'Cubre: '}
+          {solicitud.cobertura.nombre_completo}
+        </p>
+      )}
+
+      {/* 0034: quién falta por confirmar, visible sin entrar al chat. */}
+      {solicitud.estado === 'propuesta' && (
+        <p className="text-[11px] text-[#5A6B7A]">
+          Solicitante:{' '}
+          <span className="font-medium text-[#0A1628]">
+            {solicitud.acuerdo_autor ? '✓ de acuerdo' : 'sin confirmar'}
+          </span>{' '}
+          · Quien cubre:{' '}
+          <span className="font-medium text-[#0A1628]">
+            {solicitud.acuerdo_cobertura ? '✓ de acuerdo' : 'sin confirmar'}
+          </span>
+        </p>
+      )}
 
       {children}
     </Card>

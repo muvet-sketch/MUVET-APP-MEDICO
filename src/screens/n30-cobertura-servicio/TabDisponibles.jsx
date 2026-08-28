@@ -4,10 +4,13 @@ import { Button, Toast } from '../../components/ui';
 import { fetchSolicitudesAbiertas, ofrecerCobertura } from '../../lib/coberturaServicio';
 import SolicitudCard from './SolicitudCard';
 
-// "Disponibles": solicitudes de cobertura publicadas por otros médicos.
-// Ofrecerse a cubrir es una acción directa (sin paso de confirmación del
-// solicitante) — así se pidió: "el médico que visualiza las solicitudes
-// puede... ofrecerse para cubrir el servicio".
+// "Disponibles": solicitudes de relevo publicadas por otros médicos.
+//
+// 0034: ofrecerse ya NO cierra el trato. Abre la negociación ('propuesta') y
+// lleva al chat, donde las dos partes tienen que marcar "Estoy de acuerdo" para
+// que el servicio quede tomado — igual que Contactar en MUVET Turnos y en
+// MUVET Auxiliar. Mientras dura esa negociación la solicitud sale del tablón;
+// si cualquiera de los dos la descarta, vuelve acá.
 export default function TabDisponibles({ perfil }) {
   const navigate = useNavigate();
   const [solicitudes, setSolicitudes] = useState([]);
@@ -41,10 +44,10 @@ export default function TabDisponibles({ perfil }) {
     setOfreciendoId(solicitud.id);
     try {
       await ofrecerCobertura(solicitud.id);
-      showToast('Te ofreciste a cubrir. Abriendo el chat…', 'ok');
+      showToast('Te ofreciste a cubrir. Coordinen y confirmen los dos.', 'ok');
       navigate(`/cobertura-servicio/chat/${solicitud.id}`);
     } catch (err) {
-      showToast(err.message ?? 'No se pudo confirmar. Puede que ya la haya cubierto otro médico.', 'critical');
+      showToast(err.message ?? 'No se pudo ofrecer. Puede que otro médico se te haya adelantado.', 'critical');
       cargar();
     } finally {
       setOfreciendoId(null);
@@ -64,7 +67,7 @@ export default function TabDisponibles({ perfil }) {
       {solicitudes.map((s) => (
         <SolicitudCard key={s.id} solicitud={s}>
           <Button onClick={() => handleOfrecerse(s)} disabled={ofreciendoId === s.id} fullWidth={false} className="mt-1">
-            {ofreciendoId === s.id ? 'Confirmando…' : 'Ofrecerme a cubrir'}
+            {ofreciendoId === s.id ? 'Abriendo…' : 'Ofrecerme y coordinar'}
           </Button>
         </SolicitudCard>
       ))}

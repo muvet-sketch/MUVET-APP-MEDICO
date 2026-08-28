@@ -88,6 +88,23 @@ Violar cualquiera de estas reglas invalida el trabajo entregado.
   `supabase/migrations/0027`. La excepción del módulo médico↔médico (N-30,
   `cobertura_*`, hoy **MUVET Relevo** en la UI — `0023`, chat en tiempo real con
   adjuntos) sigue siendo aparte y más amplia.*
+- **Cierre de MUVET Relevo** (sin número de decisión asignado todavía —
+  pedido del fundador, implementado en `supabase/migrations/0034`) — **MUVET
+  Relevo (N-30, `cobertura_*`)** cierra igual que los otros dos módulos
+  gremiales: con el **acuerdo de ambas partes**. Ofrecerse solo abre
+  la negociación (`estado = 'propuesta'`); el servicio queda tomado
+  (`'cubierta'`) cuando están las dos banderas `acuerdo_autor` +
+  `acuerdo_cobertura`, y `estado` lo deriva el backend, nunca el cliente.
+  Descartar **no** es terminal acá —la solicitud tiene un solo cupo y vuelve al
+  tablón—, y al descartar se borran los mensajes de esa negociación. Dos reglas
+  propias de este módulo:
+  - **Sin control de pagos.** El médico que releva le cobra directamente al
+    tutor, así que no hay pago entre las dos partes que marcar ni datos
+    bancarios que intercambiar. Los RPC `cobertura_pago_*` no existen.
+  - **El chat sobrevive 24 h a la finalización** —se puede leer y escribir— y
+    después se cierra y se purga. "Sin historial del chat" (`0023`) sigue
+    vigente: la retención pasa de 0 h a 24 h, no a perpetua. El corte lo impone
+    la RLS (`cobertura_chat_abierto`), no la UI.
 - **D-552** — N-8 incluye logo/firma del médico (PNG/JPG ≤2MB) que se estampa
   en Fórmula (N-12) y Recomendaciones (N-18). Si no hay imagen: placeholder de
   iniciales + nombre + matrícula.

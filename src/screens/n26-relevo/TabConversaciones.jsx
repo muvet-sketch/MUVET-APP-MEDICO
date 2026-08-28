@@ -12,7 +12,7 @@
 // actividad.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge } from '../../components/ui';
+import { Card, Badge, Avatar } from '../../components/ui';
 import { formatFechaCorta } from '../../lib/format';
 import { fetchMisConversaciones, tieneNoLeidos, esParteAutora } from '../../lib/relevo';
 import { NOMBRE_TURNOS } from '../../lib/nombresModulos';
@@ -120,10 +120,13 @@ export default function TabConversaciones({ perfil }) {
             >
               <Card className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0A1628]">
-                    {noLeido && <span className="h-2 w-2 rounded-full bg-[#C63B3B]" aria-label="Sin leer" />}
-                    {nombreOtro}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <Avatar fotoUrl={c.otro?.foto_url} nombre={nombreOtro} size={28} />
+                    <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0A1628]">
+                      {noLeido && <span className="h-2 w-2 rounded-full bg-[#C63B3B]" aria-label="Sin leer" />}
+                      {nombreOtro}
+                    </p>
+                  </div>
                   <Badge tone={estado.tone}>{estado.label}</Badge>
                 </div>
                 <p className="text-[11px] text-[#5A6B7A]">

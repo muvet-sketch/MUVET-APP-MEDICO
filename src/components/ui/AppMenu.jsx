@@ -54,6 +54,11 @@ export default function AppMenu() {
     navigate(rutaPerfil);
   }
 
+  function irAlHistorial() {
+    setAbierto(false);
+    navigate('/historial');
+  }
+
   return (
     <div className="relative" ref={contenedorRef}>
       <button
@@ -79,6 +84,15 @@ export default function AppMenu() {
             className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
           >
             <span aria-hidden="true">👤</span> Mi perfil
+          </button>
+          <div className="h-px bg-[#E1E8ED]" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={irAlHistorial}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
+          >
+            <span aria-hidden="true">📋</span> Historial
           </button>
           <div className="h-px bg-[#E1E8ED]" />
           <button

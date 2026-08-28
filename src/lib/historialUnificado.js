@@ -82,8 +82,8 @@ export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
 
     // MUVET Auxiliar (0028). Solo las cerradas: un servicio 'aceptada' sigue
     // en curso y vive en "Servicios aceptados" del Home. A diferencia de
-    // Cobertura, el historial del chat NO se borró al finalizar, así que estos
-    // ítems sí se pueden abrir para releerlo.
+    // MUVET Relevo, el historial del chat NO se borra nunca, así que estos
+    // ítems se pueden abrir para releerlo en cualquier momento.
     ...conversacionesApoyo
       .filter((c) => APOYO_CONVERSACION_TERMINAL.includes(c.estado))
       .map((c) => normalizar('apoyo_conversacion', 'apoyo', c.cerrada_at ?? c.ultimo_mensaje_at, c)),
@@ -96,8 +96,12 @@ export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
 // Un ítem "pendiente de pago" es un SERVICIO finalizado (no una oferta, ni una
 // negociación descartada/cancelada) cuyo `pago_estado` sigue en 'pendiente'
 // (migración 0029). Lo usa el chip de N-9 y el aviso del Home.
+//
+// 'cobertura' (MUVET Relevo) quedó FUERA en 0034: ahí el médico que releva le
+// cobra directamente al tutor, así que no hay pago entre las dos partes que
+// pueda estar pendiente. Sus filas siguen entrando al historial, pero nunca al
+// filtro de pagos.
 export function esServicioFinalizado(item) {
-  if (item?.origen === 'cobertura') return item.raw?.estado === 'finalizada';
   if (item?.origen === 'relevo_conversacion' || item?.origen === 'apoyo_conversacion') {
     return item.raw?.estado === 'finalizada';
   }

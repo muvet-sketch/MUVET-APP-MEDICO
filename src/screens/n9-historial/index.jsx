@@ -98,7 +98,7 @@ export default function N9Historial() {
 
         {!loading &&
           visibles.map((item) => (
-            <ItemHistorial key={item.id} item={item} perfilId={perfil?.id} perfil={perfil} />
+            <ItemHistorial key={item.id} item={item} perfilId={perfil?.id} />
           ))}
       </div>
 

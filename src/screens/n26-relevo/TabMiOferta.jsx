@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge, Input, Button, Toggle, Toast, ChipMultiSelect, ProgressSteps, Modal } from '../../components/ui';
+import { Card, Badge, Input, Select, Button, Toggle, Toast, ChipMultiSelect, ProgressSteps, Modal } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
 import { formatCOP } from '../../lib/format';
 import {
@@ -29,6 +29,7 @@ import {
   tieneHabilidadesDePerfil,
 } from '../../lib/habilidades';
 import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
+import { fetchSedes, sedesPublicables, etiquetaSede } from '../../lib/clinicaSedes';
 
 const TIPO_JORNADA = ['Turno completo', 'Medio turno', 'Turno 12 Horas', 'Varios días'];
 // Compatibilidad con publicaciones creadas antes del renombre — `tipo_jornada`
@@ -71,6 +72,7 @@ const ESTADO_PUBLICACION_BADGE = {
 
 
 function OfertaForm({ perfil, initial, plantilla, comboFiltro, onSaved, onCancel, onLimpiarPlantilla, showToast, onPerfilChange }) {
+  const navigate = useNavigate();
   // `initial` = fila que se está EDITANDO (guarda con actualizarPublicacion).
   // `plantilla` = fila terminal (finalizada/cancelada) que se reutiliza para
   // "volver a publicar" — pre-rellena el formulario pero se guarda como fila
@@ -103,11 +105,49 @@ function OfertaForm({ perfil, initial, plantilla, comboFiltro, onSaved, onCancel
   // lo modela con `servicio_subtipo`. Todo lo que queda acá va por jornada.
 
   const [descripcion, setDescripcion] = useState(base?.descripcion ?? '');
-  // La clínica tiene una sola sede física (D-544): su "zona" de la oferta es
-  // la dirección del establecimiento, de solo lectura, no un catálogo de
-  // zonas para elegir (eso es para médico/auxiliar, que se desplazan).
+  // 0030: la clínica elige una SEDE, y esa sede aporta las dos cosas que antes
+  // iban revueltas en un solo campo — su ciudad (del catálogo, lo que alimenta
+  // el filtro de cercanía) y su dirección exacta (privada hasta el acuerdo).
+  //
+  // Antes acá se copiaba `perfil.direccion_sede` tal cual a `zona`: una
+  // dirección de calle que el filtro nunca podía comparar contra el catálogo,
+  // y por eso las ofertas de clínicas no le aparecían a nadie.
   const esClinica = perfil.rol === 'clinica';
-  const zonaClinica = perfil.direccion_sede?.trim() || '';
+  const [sedes, setSedes] = useState([]);
+  const [cargandoSedes, setCargandoSedes] = useState(esClinica);
+  const [sedeId, setSedeId] = useState(base?.sede_id ?? '');
+
+  useEffect(() => {
+    if (!esClinica) return undefined;
+    let activo = true;
+    setCargandoSedes(true);
+    fetchSedes(perfil.id)
+      .then((data) => {
+        if (!activo) return;
+        const publicables = sedesPublicables(data);
+        setSedes(publicables);
+        setSedeId((actual) => {
+          // La sede de la oferta puede haberse borrado o haberse quedado sin
+          // ciudad desde que se publicó: en ese caso hay que volver a elegir,
+          // no arrastrar un id que ya no está en la lista (dejaría el selector
+          // en blanco y el botón deshabilitado sin decir por qué).
+          if (actual && publicables.some((s) => s.id === actual)) return actual;
+          // Con una sola sede utilizable no tiene sentido hacer elegir.
+          return publicables.length === 1 ? publicables[0].id : '';
+        });
+      })
+      .catch(() => {
+        if (activo) setSedes([]);
+      })
+      .finally(() => {
+        if (activo) setCargandoSedes(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [esClinica, perfil.id]);
+
+  const sedeSeleccionada = sedes.find((s) => s.id === sedeId) ?? null;
   // Mismo catálogo cerrado que el resto del perfil (lib/municipios.js) en vez
   // de texto libre, para que el matching por zona en TabOfertas compare
   // valores consistentes (antes un Input libre no ofrecía ningún buscador
@@ -222,12 +262,19 @@ function OfertaForm({ perfil, initial, plantilla, comboFiltro, onSaved, onCancel
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    if (esClinica && !sedeSeleccionada) {
+      setError('Elige la sede desde la que publicas esta oferta.');
+      return;
+    }
+
     setSaving(true);
     try {
       const tarifaNum = tarifa === '' ? null : Number(tarifa);
       const campos = {
         descripcion,
-        zona: esClinica ? zonaClinica : serializarZonas(zonas),
+        zona: esClinica ? sedeSeleccionada.ciudad : serializarZonas(zonas),
+        sedeId: esClinica ? sedeSeleccionada.id : null,
         fechaInicio,
         fechaFin,
         tipoJornada,
@@ -316,10 +363,35 @@ function OfertaForm({ perfil, initial, plantilla, comboFiltro, onSaved, onCancel
 
       {esClinica ? (
         <div className="w-full text-left">
-          <label className="mb-1 block text-[12px] font-medium text-[#5A6B7A]">Zona / Ciudad</label>
-          <p className="rounded-[10px] border border-[#E1E8ED] bg-[#F4F7F9] px-3 py-2.5 text-[14px] text-[#0A1628]">
-            {zonaClinica || 'Configura la dirección del establecimiento en tu perfil.'}
-          </p>
+          {cargandoSedes ? (
+            <p className="text-[12px] text-[#5A6B7A]">Cargando tus sedes…</p>
+          ) : sedes.length === 0 ? (
+            <div className="rounded-[10px] border border-[#E8A33D] bg-[#E8A33D1A] px-3 py-2.5">
+              <p className="text-[12px] text-[#0A1628]">
+                Para publicar necesitas al menos una sede con ciudad configurada.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/perfil-clinica')}
+                className="mt-1 text-[12px] font-medium text-[#1A7A5E]"
+              >
+                Configurar mis sedes →
+              </button>
+            </div>
+          ) : (
+            <Select
+              label="Sede de esta oferta"
+              value={sedeId}
+              onChange={(e) => setSedeId(e.target.value)}
+              options={sedes.map((s) => ({ value: s.id, label: etiquetaSede(s) }))}
+              placeholder="Selecciona una sede"
+              hint={
+                sedeSeleccionada
+                  ? `Se publica en ${sedeSeleccionada.ciudad} y alrededores. La dirección exacta solo la ve la otra parte cuando el turno queda confirmado.`
+                  : 'Su ciudad determina qué médicos y auxiliares ven esta oferta.'
+              }
+            />
+          )}
         </div>
       ) : (
         <ChipMultiSelect
@@ -502,7 +574,7 @@ function OfertaForm({ perfil, initial, plantilla, comboFiltro, onSaved, onCancel
             Cancelar
           </Button>
         )}
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving || (esClinica && !sedeSeleccionada)}>
           {saving ? 'Guardando…' : initial ? 'Guardar cambios' : 'Publicar'}
         </Button>
       </div>

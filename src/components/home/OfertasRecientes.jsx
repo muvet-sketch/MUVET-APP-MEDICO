@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge } from '../ui';
+import { Card, Badge, Avatar } from '../ui';
 import { formatCOP, truncarTexto } from '../../lib/format';
 import { fetchPublicacionesActivas, filtrarPublicacionesPorZona, formatFranjaHoraria } from '../../lib/relevo';
 
@@ -85,7 +85,10 @@ export default function OfertasRecientes({ perfil }) {
                 className="flex w-full flex-col gap-1 text-left"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-[14px] font-medium text-[#0A1628]">{nombreAutor}</p>
+                  <div className="flex items-center gap-2">
+                    <Avatar fotoUrl={p.autor?.foto_url} nombre={nombreAutor} size={28} />
+                    <p className="text-[14px] font-medium text-[#0A1628]">{nombreAutor}</p>
+                  </div>
                   <Badge tone={badge.tone}>{badge.label}</Badge>
                 </div>
                 <p className="text-[12px] text-[#0A1628]">

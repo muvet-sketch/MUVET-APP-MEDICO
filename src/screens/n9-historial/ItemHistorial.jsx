@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge } from '../../components/ui';
+import { Card, Badge, Avatar } from '../../components/ui';
 import { formatFechaCorta } from '../../lib/format';
+import { enlaceUbicacion } from '../../lib/mapas';
+import { chatAbierto, fetchDireccionCobertura, textoVentanaChat } from '../../lib/coberturaServicio';
 import {
   NOMBRE_AUXILIAR,
   NOMBRE_RELEVO,
@@ -11,7 +14,6 @@ import {
 } from '../../lib/nombresModulos';
 import { labelSubtipo } from '../../lib/apoyo';
 import SolicitudCard from '../n30-cobertura-servicio/SolicitudCard';
-import PanelPagoServicio from '../../components/PanelPagoServicio';
 
 // Badge de estado de pago (migración 0029). Solo tiene sentido en un servicio
 // finalizado; lo pinta cada rama de servicio de abajo.
@@ -47,6 +49,54 @@ const ESTADO_CONVERSACION_BADGE = {
   descartada: { label: 'Descartada', tone: 'critical' },
 };
 
+// Punto de encuentro de un relevo ya cerrado (0032). Es el único lugar donde
+// queda una vez vence la ventana de 24 h del chat (0034): los mensajes se
+// borran, pero `cobertura_direccion` sobrevive a propósito — dónde se prestó el
+// servicio no es parte del historial de mensajes que se pidió no conservar.
+function DireccionCobertura({ solicitudId }) {
+  const [direccion, setDireccion] = useState(null);
+
+  useEffect(() => {
+    let activo = true;
+    fetchDireccionCobertura(solicitudId)
+      .then((d) => {
+        if (activo) setDireccion(d);
+      })
+      .catch(() => {
+        if (activo) setDireccion(null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [solicitudId]);
+
+  if (!direccion) return null;
+
+  const enlace = enlaceUbicacion({
+    direccion: direccion.direccion_encuentro,
+    linkMaps: direccion.link_maps,
+  });
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="text-[12px] text-[#0A1628]">
+        📍 {direccion.direccion_encuentro}
+        {direccion.referencia ? ` · ${direccion.referencia}` : ''}
+      </p>
+      {enlace && (
+        <a
+          href={enlace}
+          target="_blank"
+          rel="noreferrer"
+          className="self-start text-[12px] font-medium text-[#1A7A5E]"
+        >
+          Abrir en la app de mapas →
+        </a>
+      )}
+    </div>
+  );
+}
+
 function OrigenTag({ origen, fecha }) {
   return (
     <p className="text-[11px] text-[#5A6B7A]">
@@ -60,38 +110,35 @@ function OrigenTag({ origen, fecha }) {
 // mensajes sueltos post-aceptación. Una conversación cerrada se abre en su
 // propio hilo, en solo lectura, y el contacto directo (teléfono) sale de la
 // ficha ampliada dentro de esa pantalla.
-export default function ItemHistorial({ item, perfilId, perfil }) {
+export default function ItemHistorial({ item, perfilId }) {
   const navigate = useNavigate();
   const { origen, fecha, raw } = item;
 
   if (origen === 'cobertura') {
-    // MUVET Relevo borra el chat al finalizar (0023), así que este es el único
-    // sitio donde el pago de una cobertura ya cerrada se puede registrar y
-    // consultar después (0029).
-    const finalizada = raw.estado === 'finalizada';
-    const nombreContraparte =
-      raw.autor_id === perfilId ? raw.cobertura?.nombre_completo : raw.autor?.nombre_completo;
+    // Sin badge ni panel de pago: 0034 sacó MUVET Relevo del control de pagos
+    // porque acá el médico que releva le cobra directamente al tutor.
+    //
+    // El chat sigue accesible durante 24 h desde la finalización (0034), así que
+    // mientras la ventana corre este ítem lleva al hilo; después ya no hay hilo
+    // al que llevar y queda solo el detalle del servicio.
+    const conChat = chatAbierto(raw);
     return (
       <div className="flex flex-col gap-2">
         <SolicitudCard solicitud={raw}>
           <div className="flex flex-col gap-2 border-t border-[#E1E8ED] pt-2">
-            {finalizada && (
-              <div>
-                <PagoBadge estado={raw.pago_estado} />
-              </div>
+            <DireccionCobertura solicitudId={raw.id} />
+            {conChat && (
+              <button
+                type="button"
+                onClick={() => navigate(`/cobertura-servicio/chat/${raw.id}`)}
+                className="self-start text-[12px] font-medium text-[#1A7A5E]"
+              >
+                Abrir chat → <span className="font-normal text-[#5A6B7A]">{textoVentanaChat(raw)}</span>
+              </button>
             )}
             <OrigenTag origen={origen} fecha={fecha} />
           </div>
         </SolicitudCard>
-        {finalizada && perfil && (
-          <PanelPagoServicio
-            modulo="cobertura"
-            servicioId={raw.id}
-            fila={raw}
-            perfil={perfil}
-            nombreContraparte={nombreContraparte}
-          />
-        )}
       </div>
     );
   }
@@ -151,7 +198,10 @@ export default function ItemHistorial({ item, perfilId, perfil }) {
   return (
     <Card className="flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[14px] font-medium text-[#0A1628]">{nombreOtro}</p>
+        <div className="flex items-center gap-2">
+          <Avatar fotoUrl={raw.otro?.foto_url} nombre={nombreOtro} size={32} />
+          <p className="text-[14px] font-medium text-[#0A1628]">{nombreOtro}</p>
+        </div>
         <div className="flex flex-col items-end gap-1">
           <Badge tone={badge.tone}>{badge.label}</Badge>
           {raw.estado === 'finalizada' && <PagoBadge estado={raw.pago_estado} />}

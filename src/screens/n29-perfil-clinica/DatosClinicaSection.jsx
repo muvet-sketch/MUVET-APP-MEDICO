@@ -96,7 +96,20 @@ export default function DatosClinicaSection() {
 
       <Input label="Razón social" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} />
       <Input label="NIT" value={nit} onChange={(e) => setNit(e.target.value)} />
-      <Input label="Dirección del establecimiento" value={direccionSede} onChange={(e) => setDireccionSede(e.target.value)} />
+      {/* SUPUESTO: `direccion_sede` se conserva como dato legacy (lo pinta la
+          cabecera del perfil y es el fallback de relevo_ficha_contacto cuando
+          una oferta antigua no tiene sede). La ubicación que de verdad usa la
+          app —la que alimenta el filtro de cercanía y la que se revela tras el
+          acuerdo— vive desde 0030 en la sección "Sedes" de abajo. */}
+      <Input
+        label="Dirección principal"
+        value={direccionSede}
+        onChange={(e) => setDireccionSede(e.target.value)}
+      />
+      <p className="-mt-2 text-[11px] text-[#5A6B7A]">
+        Para publicar ofertas usa la sección “Sedes”: allí cada establecimiento lleva su ciudad, que es lo
+        que determina qué médicos y auxiliares ven tus ofertas.
+      </p>
       <Input label="Teléfono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
 
       <Input label="Correo" value={session?.user?.email ?? ''} disabled />

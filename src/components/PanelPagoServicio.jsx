@@ -9,17 +9,20 @@ import {
   marcarPagoServicio,
   compartirDatosPagoServicio,
   fetchDatosPagoContraparte,
+  puedeCompartirDatosPago,
+  moduloTienePagos,
 } from '../lib/pagos';
 
-// Panel de pago de un servicio, común a los tres módulos gremiales
-// (migración 0029). Se monta en las pantallas de conversación/servicio de
-// MUVET Turnos (ConversacionRelevo), MUVET Relevo (ChatCobertura,
-// TabMisSolicitudes, y el historial N-9 para las ya finalizadas) y MUVET
-// Auxiliar (ConversacionApoyo), cuando el servicio está confirmado o finalizado.
+// Panel de pago de un servicio, común a MUVET Turnos (ConversacionRelevo) y
+// MUVET Auxiliar (ConversacionApoyo), cuando el servicio está confirmado o
+// finalizado (migración 0029).
+//
+// MUVET Relevo (N-30, `cobertura_*`) ya NO lo monta: 0034 lo sacó del control
+// de pagos porque ahí el médico que releva le cobra directamente al tutor.
 //
 // props:
-//   modulo            'relevo' | 'apoyo' | 'cobertura' (ids internos)
-//   servicioId        id de la conversación (relevo/apoyo) o solicitud (cobertura)
+//   modulo            'relevo' | 'apoyo' (ids internos)
+//   servicioId        id de la conversación
 //   fila              la fila ya cargada del servicio (trae pago_* y autor_id)
 //   perfil            perfil del usuario actual
 //   nombreContraparte texto para "Datos de pago de …"
@@ -46,6 +49,9 @@ export default function PanelPagoServicio({ modulo, servicioId, fila, perfil, no
 
   const nombre = nombreContraparte || 'la otra parte';
   const tengoDatos = perfilTieneDatosPago(perfil);
+  // 0033: los datos de pago los comparte quien COBRA. Quien paga no publica su
+  // cuenta bancaria — solo marca el pago y copia los datos del otro.
+  const meTocaCompartir = puedeCompartirDatosPago(modulo, filaEfectiva, perfil);
 
   function showToast(message, tone = 'ok') {
     setToast({ message, tone, visible: true });
@@ -128,6 +134,10 @@ export default function PanelPagoServicio({ modulo, servicioId, fila, perfil, no
 
   const filasDatos = filasDatosPago(datosContraparte);
 
+  // Red de seguridad para un módulo sin control de pagos (hoy 'cobertura', que
+  // salió en 0034). Va DESPUÉS de los hooks: sacarlo arriba rompería el orden.
+  if (!moduloTienePagos(modulo)) return null;
+
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
@@ -148,29 +158,35 @@ export default function PanelPagoServicio({ modulo, servicioId, fila, perfil, no
         {marcando ? 'Guardando…' : pagado ? 'Marcar como pendiente' : 'Marcar como pagado'}
       </Button>
 
-      <div className="border-t border-[#E1E8ED] pt-3">
-        <p className="text-[12px] font-medium text-[#5A6B7A]">Mis datos de pago</p>
-        {tengoDatos ? (
-          <Button
-            variant="outline"
-            fullWidth={false}
-            className="mt-2 !w-auto px-3 py-2 text-[13px]"
-            disabled={compartiendo}
-            onClick={handleCompartir}
-          >
-            {compartiendo
-              ? 'Guardando…'
-              : yoComparto
-                ? 'Dejar de compartir mis datos'
-                : 'Compartir mis datos de pago'}
-          </Button>
-        ) : (
-          <p className="mt-1 text-[12px] text-[#5A6B7A]">
-            Configúralos en tu perfil para poder compartirlos con la otra parte.
-          </p>
-        )}
-      </div>
+      {meTocaCompartir && (
+        <div className="border-t border-[#E1E8ED] pt-3">
+          <p className="text-[12px] font-medium text-[#5A6B7A]">Mis datos de pago</p>
+          {tengoDatos ? (
+            <Button
+              variant="outline"
+              fullWidth={false}
+              className="mt-2 !w-auto px-3 py-2 text-[13px]"
+              disabled={compartiendo}
+              onClick={handleCompartir}
+            >
+              {compartiendo
+                ? 'Guardando…'
+                : yoComparto
+                  ? 'Dejar de compartir mis datos'
+                  : 'Compartir mis datos de pago'}
+            </Button>
+          ) : (
+            <p className="mt-1 text-[12px] text-[#5A6B7A]">
+              Configúralos en tu perfil para poder compartirlos con la otra parte.
+            </p>
+          )}
+        </div>
+      )}
 
+      {/* El otro lado del mismo criterio: quien cobra no necesita la cuenta de
+          quien paga, y dejarle un "aún no compartió sus datos" que nunca se va
+          a resolver solo confunde. */}
+      {!meTocaCompartir && (
       <div className="border-t border-[#E1E8ED] pt-3">
         <p className="text-[12px] font-medium text-[#5A6B7A]">Datos de pago de {nombre}</p>
         {filasDatos.length > 0 ? (
@@ -206,6 +222,7 @@ export default function PanelPagoServicio({ modulo, servicioId, fila, perfil, no
           <p className="mt-1 text-[12px] text-[#5A6B7A]">{nombre} aún no compartió sus datos de pago.</p>
         )}
       </div>
+      )}
 
       <Toast message={toast.message} tone={toast.tone} visible={toast.visible} />
     </Card>

@@ -50,8 +50,13 @@ const PRESENTACION = {
   relevo_respuesta: { icono: '↩️', familia: 'relevo' }, // histórico (pre-0027)
   cobertura_ofrecimiento: { icono: '🤝', familia: 'cobertura' },
   cobertura_mensaje: { icono: '💬', familia: 'cobertura' },
+  cobertura_acuerdo: { icono: '👍', familia: 'cobertura' }, // 0034
+  cobertura_confirmada: { icono: '✅', familia: 'cobertura' }, // 0034
+  cobertura_descartada: { icono: '🚫', familia: 'cobertura' }, // 0034
   cobertura_finalizada: { icono: '🏁', familia: 'cobertura' },
-  cobertura_pago: { icono: '💳', familia: 'cobertura' }, // 0029
+  // 0029, retirado en 0034 (MUVET Relevo salió del control de pagos). Se deja
+  // el mapeo para que los avisos ya enviados sigan pintándose.
+  cobertura_pago: { icono: '💳', familia: 'cobertura' },
   // MUVET Auxiliar (0028)
   apoyo_contacto: { icono: '💬', familia: 'apoyo' },
   apoyo_mensaje: { icono: '💬', familia: 'apoyo' },

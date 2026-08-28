@@ -4,6 +4,7 @@ import { useAuth } from '../../app/AuthContext';
 import { ScreenHeader, BottomNav } from '../../components/ui';
 import HeaderPerfilClinica from './HeaderPerfilClinica';
 import DatosClinicaSection from './DatosClinicaSection';
+import SedesSection from './SedesSection';
 import MisPublicacionesSection from './MisPublicacionesSection';
 
 export default function N29PerfilClinica() {
@@ -16,6 +17,7 @@ export default function N29PerfilClinica() {
       <div className="flex flex-col gap-5 px-5 pb-24">
         <HeaderPerfilClinica perfil={perfil} />
         <DatosClinicaSection />
+        <SedesSection perfil={perfil} />
         <MisPublicacionesSection perfil={perfil} />
       </div>
       <BottomNav />

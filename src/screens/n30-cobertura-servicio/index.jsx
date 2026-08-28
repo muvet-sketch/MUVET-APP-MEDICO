@@ -10,11 +10,12 @@
 // cobertura_*, lib/coberturaServicio.js). "MUVET Relevo" en la UI = este
 // módulo; el de la ruta /relevo es MUVET Turnos, la bolsa gremial (N-26).
 // Ver el bloque de lib/nombresModulos.js.
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ScreenHeader, BottomNav } from '../../components/ui';
 import { useAuth } from '../../app/AuthContext';
 import { NOMBRE_RELEVO } from '../../lib/nombresModulos';
+import { purgarChatsVencidos } from '../../lib/coberturaServicio';
 import TabDisponibles from './TabDisponibles';
 import TabMisSolicitudes from './TabMisSolicitudes';
 
@@ -26,10 +27,27 @@ const TABS = [
   { key: 'mis-solicitudes', label: 'Mis Solicitudes' },
 ];
 
+const TABS_VALIDAS = TABS.map((t) => t.key);
+
 export default function N30CoberturaServicio() {
   const { perfil } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState('disponibles');
+  const [searchParams] = useSearchParams();
+  // La pestaña inicial puede venir por deep link (/cobertura-servicio?tab=...),
+  // que es como entra la sección de este módulo en la Home. Mismo patrón que
+  // /relevo?tab=ofertas y /apoyo?tab=disponibles.
+  const tabInicial = searchParams.get('tab');
+  const [tab, setTab] = useState(
+    TABS_VALIDAS.includes(tabInicial) ? tabInicial : 'disponibles',
+  );
+
+  // Purga perezosa de los chats cuya ventana de 24 h ya venció (0034 §4.6).
+  // Best-effort: la ventana la cierra la RLS, esto solo hace efectivo el
+  // borrado. Mismo criterio que `expirarSolicitudesVencidas` en la Home.
+  useEffect(() => {
+    if (!perfil?.id) return;
+    purgarChatsVencidos().catch(() => {});
+  }, [perfil?.id]);
 
   if (!perfil) return null;
 
