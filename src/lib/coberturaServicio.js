@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { filtrarPorZonaCobertura } from './municipios';
 
 // MUVET Relevo (N-30) — médico↔médico. El módulo y sus tablas conservan el
 // nombre viejo, `cobertura`; el que se llama `relevo` en el código es MUVET
@@ -81,6 +82,37 @@ export function textoVentanaChat(solicitud) {
   return `El chat se cierra en ${Math.floor(minutos / 60)} h.`;
 }
 
+// ============================================================================
+// Sin leer (migración 0038)
+// ============================================================================
+// Este módulo no tiene tabla de conversaciones: la negociación vive en la
+// propia solicitud, así que `ultimo_mensaje_at` y los dos `leido_*_at` cuelgan
+// de `cobertura_solicitudes`. El equivalente en los otros dos módulos son
+// tieneNoLeidos (lib/relevo.js) y tieneNoLeidosApoyo (lib/apoyo.js).
+//
+// Tres condiciones, y las tres importan:
+//   · Tiene que haber mensajes. `ultimo_mensaje_at` es null mientras nadie
+//     escribe, y una solicitud recién publicada no es un chat sin leer.
+//   · El chat tiene que seguir abierto. Pasada la ventana de 24 h los mensajes
+//     se purgan (0034): un punto rojo sobre un hilo que ya no se puede abrir es
+//     un callejón sin salida.
+//   · Y, claro, que haya llegado algo después de la última vez que miré.
+export function tieneNoLeidosCobertura(solicitud, perfilId) {
+  if (!solicitud?.ultimo_mensaje_at) return false;
+  if (!chatAbierto(solicitud)) return false;
+  const visto = solicitud.autor_id === perfilId ? solicitud.leido_autor_at : solicitud.leido_cobertura_at;
+  if (!visto) return true;
+  return new Date(solicitud.ultimo_mensaje_at) > new Date(visto);
+}
+
+// Por RPC y no por update directo: 0034 le quitó al cliente toda policy de
+// update sobre `cobertura_solicitudes` a propósito, y 0038 respeta esa
+// frontera. El RPC escribe solo la columna del lado de quien llama.
+export async function marcarSolicitudLeida(solicitudId) {
+  const { error } = await supabase.rpc('cobertura_marcar_leida', { p_solicitud_id: solicitudId });
+  if (error) throw error;
+}
+
 // Mi bandera de acuerdo y la de la otra parte, según de qué lado estoy.
 export function acuerdosCobertura(solicitud, perfilId) {
   const soyAutor = solicitud?.autor_id === perfilId;
@@ -91,20 +123,19 @@ export function acuerdosCobertura(solicitud, perfilId) {
   };
 }
 
-// Mismo criterio de zona que filtrarPublicacionesPorZona (lib/relevo.js) y
-// filtrarPorZona (lib/apoyo.js): `zona_cobertura` del perfil es texto con zonas
-// separadas por coma y basta con que la solicitud mencione cualquiera de las
-// mías. Sin zona configurada no se filtra nada.
+// Filtro de zona para la vista previa del Home (components/home/
+// RelevosDisponibles.jsx). El tablón del módulo (N-30 › Disponibles) NO filtra:
+// muestra todo lo abierto. Acá se acota a "lo mío" porque el Home es un
+// resumen, no el tablón.
+//
+// Tenía su propia comparación por substring, y de ahí salía el bug de "Relevos
+// disponibles vacío mientras el tablón sí mostraba cosas": `zona` es opcional
+// al publicar (crearSolicitud la guarda como null) y comparar substring contra
+// cadena vacía da siempre false, así que una solicitud sin zona era invisible
+// para TODO médico con zona configurada. Ahora delega en el criterio único de
+// lib/municipios.js, que además entiende áreas metropolitanas y acentos.
 export function filtrarSolicitudesPorZona(solicitudes, zonaCobertura) {
-  const zonas = (zonaCobertura ?? '')
-    .split(',')
-    .map((z) => z.trim())
-    .filter(Boolean);
-  if (zonas.length === 0) return solicitudes;
-  return solicitudes.filter((s) => {
-    const zona = (s.zona ?? '').toLowerCase();
-    return zonas.some((z) => zona.includes(z.toLowerCase()));
-  });
+  return filtrarPorZonaCobertura(solicitudes, zonaCobertura);
 }
 
 async function adjuntarPerfil(filas, campoId, campoSalida) {
@@ -114,7 +145,10 @@ async function adjuntarPerfil(filas, campoId, campoSalida) {
   // `perfiles_publico` (0014): única vista legible por cualquier autenticado
   // sin exponer datos sensibles (teléfono, matrícula) — mismo patrón que
   // adjuntarAutores en lib/relevo.js.
-  const { data, error } = await supabase.from('perfiles_publico').select('id, nombre_completo').in('id', ids);
+  const { data, error } = await supabase
+    .from('perfiles_publico')
+    .select('id, rol, nombre_completo')
+    .in('id', ids);
   if (error) throw error;
 
   const porId = new Map((data ?? []).map((p) => [p.id, p]));

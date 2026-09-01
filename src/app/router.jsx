@@ -28,6 +28,8 @@ import N32Auxiliar from '../screens/n32-auxiliar';
 import ConversacionApoyo from '../screens/n32-auxiliar/ConversacionApoyo';
 import Soporte from '../screens/soporte';
 import N33Mejoras from '../screens/n33-mejoras';
+import N34Mensajes from '../screens/n34-mensajes';
+import N34MensajesContacto from '../screens/n34-mensajes/HistorialContacto';
 
 export default function AppRouter() {
   return (
@@ -76,6 +78,15 @@ export default function AppRouter() {
           (médico↔médico) simplemente les vuelve vacío. El historial de
           DOMICILIOS ya no está aquí: vive en /servicios (N-27). */}
       <Route path="/historial" element={<ProtectedRoute><N9Historial /></ProtectedRoute>} />
+      {/* N-34: Mensajes — bandeja unificada AGRUPADA POR CONTACTO (las mismas
+          tres fuentes que /historial, pero abierto + cerrado y por persona en
+          vez de cronológico). Abierta a los 3 actores, igual que /historial:
+          cada rol ve solo los módulos en los que participa (la clínica no tiene
+          MUVET Relevo ni MUVET Auxiliar, y le queda solo Turnos).
+          No hay pantalla de chat propia: cada conversación se abre en el hilo
+          de su módulo, que es donde viven sus acciones y su RLS. */}
+      <Route path="/mensajes" element={<ProtectedRoute><N34Mensajes /></ProtectedRoute>} />
+      <Route path="/mensajes/:contactoId" element={<ProtectedRoute><N34MensajesContacto /></ProtectedRoute>} />
       {/* N-5: Expediente del paciente — implementado en Fase 3, renumerado en Fase 4
           (Acción 0, ver CLAUDE.md/D-56X-ENM). Acepta ?modo=lectura (desde N-4) y el id
           literal 'nuevo' (caso paciente sin expediente previo). */}

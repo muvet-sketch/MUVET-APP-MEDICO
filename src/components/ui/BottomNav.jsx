@@ -22,6 +22,13 @@ import {
 // accionable y no cabía de otro modo. La clínica no participa en ese módulo
 // (es médico↔auxiliar), así que se queda con tres pestañas.
 //
+// N-34: "Historial" SALE de la barra de auxiliar y clínica y su lugar lo toma
+// "Mensajes" (/mensajes) — conversar es trabajo accionable y el historial es
+// consulta ocasional. Historial no se pierde: queda en el menú hamburguesa,
+// que es por donde el médico ya llegaba (nunca tuvo la pestaña). La barra del
+// médico no cambia: sus cuatro lugares son los tres módulos gremiales + Inicio,
+// y a Mensajes llega por el menú.
+//
 // Recordar que los nombres visibles NO coinciden con las rutas en ninguno de
 // los tres módulos gremiales: ver lib/nombresModulos.js.
 const TABS_POR_ROL = {
@@ -35,12 +42,12 @@ const TABS_POR_ROL = {
     { key: 'home', label: 'Inicio', icon: '🏠', to: '/home-simplificado', activo: (p) => p === '/home-simplificado' },
     { key: 'turnos', label: CORTO_TURNOS, icon: ICONO_TURNOS, to: '/relevo', activo: (p) => p.startsWith('/relevo') },
     { key: 'apoyo', label: CORTO_AUXILIAR, icon: ICONO_AUXILIAR, to: '/apoyo', activo: (p) => p.startsWith('/apoyo') },
-    { key: 'historial', label: 'Historial', icon: '📋', to: '/historial', activo: (p) => p.startsWith('/historial') },
+    { key: 'mensajes', label: 'Mensajes', icon: '💬', to: '/mensajes', activo: (p) => p.startsWith('/mensajes') },
   ],
   clinica: [
     { key: 'home', label: 'Inicio', icon: '🏠', to: '/home-simplificado', activo: (p) => p === '/home-simplificado' },
     { key: 'turnos', label: CORTO_TURNOS, icon: ICONO_TURNOS, to: '/relevo', activo: (p) => p.startsWith('/relevo') },
-    { key: 'historial', label: 'Historial', icon: '📋', to: '/historial', activo: (p) => p.startsWith('/historial') },
+    { key: 'mensajes', label: 'Mensajes', icon: '💬', to: '/mensajes', activo: (p) => p.startsWith('/mensajes') },
   ],
 };
 

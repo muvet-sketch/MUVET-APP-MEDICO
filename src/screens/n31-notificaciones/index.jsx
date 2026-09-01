@@ -86,7 +86,7 @@ export default function N31Notificaciones() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <ScreenHeader title="Notificaciones" fallbackTo={perfil?.rol === 'medico' ? '/home' : '/home-simplificado'} />
+      <ScreenHeader title="Notificaciones" fallbackTo={perfil?.rol === 'medico' ? '/home' : '/home-simplificado'} conCampana />
 
       <div className="flex flex-1 flex-col gap-3 px-5 py-5 pb-24">
         <div className="flex gap-2">

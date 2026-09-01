@@ -1,5 +1,6 @@
 import { getInitials } from '../../lib/format';
 import { useSignedUrl } from '../../lib/storage';
+import { colorAvatar } from '../../lib/avatarColor';
 
 // Avatar circular con imagen (logo de clínica o foto de perfil) e iniciales
 // como fallback. Consolida el patrón repetido en HeaderPerfil (N-8),
@@ -13,7 +14,12 @@ import { useSignedUrl } from '../../lib/storage';
 // nombre. `perfiles_publico` (migración 0035) solo expone `foto_url` para
 // perfiles de rol 'clinica'; para médicos y auxiliares llega null y el avatar
 // cae a iniciales, que es el comportamiento buscado.
-export default function Avatar({ fotoUrl, nombre, size = 32, className = '' }) {
+//
+// `rol` + `semilla` deciden el color de ese círculo de iniciales (ver
+// lib/avatarColor.js): el rol elige la familia de color y la semilla —el id del
+// perfil— el tono dentro de la familia. Sin `rol` se conserva el azul marino de
+// siempre, así que quien no los pase no cambia de aspecto.
+export default function Avatar({ fotoUrl, nombre, rol, semilla, size = 32, className = '' }) {
   const signedUrl = useSignedUrl(fotoUrl);
   const dimension = { width: size, height: size };
   const initials = getInitials(nombre) || '—';
@@ -31,8 +37,8 @@ export default function Avatar({ fotoUrl, nombre, size = 32, className = '' }) {
 
   return (
     <div
-      style={dimension}
-      className={`flex shrink-0 items-center justify-center rounded-full bg-[#0A1628] font-semibold text-white ${className}`}
+      style={{ ...dimension, backgroundColor: colorAvatar(rol, semilla ?? nombre) }}
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${className}`}
       aria-hidden="true"
     >
       <span style={{ fontSize: Math.round(size * 0.4) }}>{initials}</span>

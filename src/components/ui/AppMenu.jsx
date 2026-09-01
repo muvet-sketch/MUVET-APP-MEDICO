@@ -54,6 +54,11 @@ export default function AppMenu() {
     navigate(rutaPerfil);
   }
 
+  function irAMensajes() {
+    setAbierto(false);
+    navigate('/mensajes');
+  }
+
   function irAlHistorial() {
     setAbierto(false);
     navigate('/historial');
@@ -91,6 +96,21 @@ export default function AppMenu() {
             <span aria-hidden="true">👤</span> Mi perfil
           </button>
           <div className="h-px bg-[#E1E8ED]" />
+          {/* N-34: para el médico este es el ÚNICO acceso a Mensajes — su barra
+              inferior está llena con los tres módulos gremiales. El auxiliar y
+              la clínica además lo tienen como pestaña. */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={irAMensajes}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
+          >
+            <span aria-hidden="true">💬</span> Mensajes
+          </button>
+          <div className="h-px bg-[#E1E8ED]" />
+          {/* Historial sigue acá para los TRES roles: N-34 le quitó la pestaña
+              a auxiliar y clínica, así que este pasó a ser su único acceso —
+              como ya lo era para el médico. */}
           <button
             type="button"
             role="menuitem"

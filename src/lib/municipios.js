@@ -106,8 +106,21 @@ export const AREAS_METROPOLITANAS = {
   ],
 };
 
+// Insensible a mayúsculas Y a acentos. Lo segundo importa: la "Zona de
+// cobertura" fue campo de texto libre antes del catálogo cerrado (0015), y
+// quedaron perfiles con valores escritos a mano tipo 'medellin'. Sin quitar los
+// diacríticos, 'medellin' no casaba con 'Medellín' y ese perfil no veía NADA en
+// los tres módulos gremiales — ni ofertas, ni relevos, ni auxiliares.
+//
+// NFD separa cada letra de su diacrítico y el rango U+0300–U+036F (los signos
+// combinantes) los borra: 'Medellín' → 'medellin', 'Itagüí' → 'itagui'. Solo
+// ensancha las coincidencias, nunca las quita.
 function normalizar(valor) {
-  return (valor ?? '').trim().toLowerCase();
+  return (valor ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 // A qué área pertenece un municipio, o null si no está en ninguna.
@@ -130,6 +143,52 @@ export function mismaAreaOCiudad(a, b) {
   if (za === zb) return true;
   const areaA = areaDe(a);
   return Boolean(areaA) && areaA === areaDe(b);
+}
+
+// ¿Esta publicación/solicitud le queda cerca a un perfil? Es el criterio de
+// zona ÚNICO de los tres módulos gremiales — Turnos (lib/relevo.js), Relevo
+// (lib/coberturaServicio.js) y Auxiliar (lib/apoyo.js) lo llaman todos desde
+// acá. Vivía en lib/relevo.js, pero no es propio de aquel módulo y tenerlo ahí
+// llevó a que los otros dos reimplementaran su propia versión con substring
+// pelado, cada una con sus agujeros.
+//
+// Tres reglas, en orden:
+//   1. Perfil sin zona configurada → no se filtra nada.
+//   2. Publicación SIN zona declarada → visible. Si no se declaró zona no hay
+//      nada que comparar, y excluirla la volvía invisible para todo perfil con
+//      zona configurada: nadie podía verla nunca. (`zona` es opcional al menos
+//      en MUVET Relevo, ver crearSolicitud.)
+//   3. Coincide si comparten ciudad o área metropolitana (`mismaAreaOCiudad`),
+//      con el substring como respaldo para las `zona` de texto libre anteriores
+//      al catálogo cerrado (0015), que si no desaparecerían.
+//
+// SUPUESTO (heredado): se hace el split a mano en vez de usar parseZonas()
+// justamente para no descartar esas zonas fuera del catálogo.
+export function zonaCoincide(zonaPublicacion, zonasPerfil) {
+  if (!zonasPerfil || zonasPerfil.length === 0) return true;
+  const zonasDeLaOferta = (zonaPublicacion ?? '')
+    .split(',')
+    .map((z) => z.trim())
+    .filter(Boolean);
+  if (zonasDeLaOferta.length === 0) return true;
+
+  return zonasPerfil.some((mia) =>
+    zonasDeLaOferta.some(
+      (suya) => mismaAreaOCiudad(mia, suya) || normalizar(suya).includes(normalizar(mia)),
+    ),
+  );
+}
+
+// El filtro que usan las tres bandejas y las tres vistas del Home: recibe la
+// columna `zona_cobertura` del perfil (texto con zonas separadas por coma) y
+// deja pasar lo que le queda cerca.
+export function filtrarPorZonaCobertura(filas, zonaCobertura) {
+  const zonas = (zonaCobertura ?? '')
+    .split(',')
+    .map((z) => z.trim())
+    .filter(Boolean);
+  if (zonas.length === 0) return filas;
+  return filas.filter((f) => zonaCoincide(f.zona, zonas));
 }
 
 // Descarta valores que ya no estén en el catálogo (p. ej. si el fundador

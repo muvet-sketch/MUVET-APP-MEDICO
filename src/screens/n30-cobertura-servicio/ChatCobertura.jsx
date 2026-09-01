@@ -38,6 +38,7 @@ import {
   chatAbierto,
   textoVentanaChat,
   acuerdosCobertura,
+  marcarSolicitudLeida,
 } from '../../lib/coberturaServicio';
 
 function ArchivoAdjunto({ path, tipo, nombre }) {
@@ -174,6 +175,17 @@ export default function ChatCobertura() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensajes.length]);
+
+  // Marcar leído (0038). Se repite con cada mensaje nuevo, no solo al montar:
+  // si llega uno con la pantalla abierta, ya está visto. Es lo que apaga el
+  // punto rojo en N-34 · Mensajes.
+  //
+  // Best-effort: el RPC rechaza a quien no participa, y que falle no debe
+  // romper el chat. Sin mensajes no hay nada que marcar.
+  useEffect(() => {
+    if (!solicitudId || mensajes.length === 0) return;
+    marcarSolicitudLeida(solicitudId).catch(() => {});
+  }, [solicitudId, mensajes.length]);
 
   function handleFileChange(e) {
     const file = e.target.files?.[0] ?? null;

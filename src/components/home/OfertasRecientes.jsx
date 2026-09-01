@@ -86,7 +86,13 @@ export default function OfertasRecientes({ perfil }) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Avatar fotoUrl={p.autor?.foto_url} nombre={nombreAutor} size={28} />
+                    <Avatar
+                      fotoUrl={p.autor?.foto_url}
+                      nombre={nombreAutor}
+                      rol={p.autor?.rol}
+                      semilla={p.autor?.id}
+                      size={28}
+                    />
                     <p className="text-[14px] font-medium text-[#0A1628]">{nombreAutor}</p>
                   </div>
                   <Badge tone={badge.tone}>{badge.label}</Badge>

@@ -121,7 +121,13 @@ export default function TabConversaciones({ perfil }) {
               <Card className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Avatar fotoUrl={c.otro?.foto_url} nombre={nombreOtro} size={28} />
+                    <Avatar
+                      fotoUrl={c.otro?.foto_url}
+                      nombre={nombreOtro}
+                      rol={c.otro?.rol}
+                      semilla={c.otro?.id}
+                      size={28}
+                    />
                     <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0A1628]">
                       {noLeido && <span className="h-2 w-2 rounded-full bg-[#C63B3B]" aria-label="Sin leer" />}
                       {nombreOtro}

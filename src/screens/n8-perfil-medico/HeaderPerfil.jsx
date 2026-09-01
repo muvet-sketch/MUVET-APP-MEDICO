@@ -1,6 +1,7 @@
 import { Badge } from '../../components/ui';
 import { getInitials } from '../../lib/format';
 import { useSignedUrl } from '../../lib/storage';
+import { colorAvatar } from '../../lib/avatarColor';
 
 const ESTADO_BADGE = {
   validado: { tone: 'ok', label: '✅ Vigente' },
@@ -23,7 +24,12 @@ export default function HeaderPerfil({ perfil }) {
           className="h-20 w-20 rounded-full object-cover"
         />
       ) : (
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#0A1628] text-[20px] font-semibold text-white">
+        // Sin foto, el círculo de iniciales toma el color del rol + el id del
+        // perfil, igual que el avatar de los módulos gremiales (lib/avatarColor.js).
+        <div
+          style={{ backgroundColor: colorAvatar(perfil.rol, perfil.id) }}
+          className="flex h-20 w-20 items-center justify-center rounded-full text-[20px] font-semibold text-white"
+        >
           {getInitials(perfil.nombre_completo) || '—'}
         </div>
       )}

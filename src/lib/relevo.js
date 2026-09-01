@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { subscribeInserts, subscribeRow } from './chatRealtime';
-import { mismaAreaOCiudad } from './municipios';
+import { zonaCoincide, filtrarPorZonaCobertura } from './municipios';
 
 // N-26 · MUVET Turnos (D-540/D-545/D-546). Capa de acceso a datos, siguiendo
 // el patrón de lib/solicitudes.js y lib/coberturaServicio.js.
@@ -126,49 +126,19 @@ export async function fetchPublicacionesActivas({ tipo, rolObjetivo, paraRol, zo
 // columna de texto con las zonas separadas por coma (ver parseZonas en
 // lib/municipios.js), y `relevo_publicaciones.zona` se serializa igual.
 //
-// 0030 cambia el criterio de comparación. Antes era substring, y eso fallaba
-// por los dos lados:
+// 0030 cambió el criterio de comparación (antes era substring pelado, que
+// fallaba por los dos lados: demasiado estrecho entre municipios vecinos —un
+// médico en Envigado no veía una oferta en Bello— y a la vez inútil con las
+// clínicas, cuya `zona` era la dirección de calle). Hoy la ciudad de la oferta
+// sale de la sede elegida y la comparación es por ciudad o área metropolitana.
 //
-//   · Demasiado ESTRECHO entre municipios vecinos: un médico en Envigado no
-//     veía una oferta en Bello, aunque estén a quince minutos.
-//   · Demasiado LAXO y a la vez inútil con las clínicas: su `zona` era la
-//     dirección de calle del establecimiento, que nunca contiene el nombre de
-//     una zona del catálogo, así que sus ofertas no le aparecían a nadie.
-//
-// Ahora la ciudad de la oferta sale de la sede elegida (catálogo cerrado) y la
-// comparación es `mismaAreaOCiudad`: misma ciudad o misma área metropolitana.
-// Sin zona configurada se sigue sin filtrar nada.
-//
-// SUPUESTO: se hace el split a mano en vez de usar parseZonas() porque este
-// filtro no debe descartar zonas fuera del catálogo — las publicaciones
-// anteriores al catálogo cerrado (0015) tienen `zona` de texto libre. Para
-// ellas se conserva el substring como respaldo, así que siguen visibles como
-// hasta ahora en vez de desaparecer con esta migración.
-export function zonaCoincide(zonaPublicacion, zonasPerfil) {
-  if (!zonasPerfil || zonasPerfil.length === 0) return true;
-  const zonasDeLaOferta = (zonaPublicacion ?? '')
-    .split(',')
-    .map((z) => z.trim())
-    .filter(Boolean);
-  if (zonasDeLaOferta.length === 0) return false;
-
-  return zonasPerfil.some((mia) =>
-    zonasDeLaOferta.some(
-      (suya) =>
-        mismaAreaOCiudad(mia, suya) ||
-        // Respaldo para las `zona` de texto libre previas al catálogo.
-        suya.toLowerCase().includes(mia.toLowerCase()),
-    ),
-  );
-}
+// La función en sí ya no vive acá: se mudó a lib/municipios.js, junto al
+// catálogo y a `mismaAreaOCiudad`, porque el criterio es de los TRES módulos
+// gremiales y no de este. Se re-exporta porque N-26 la importa desde acá.
+export { zonaCoincide };
 
 export function filtrarPublicacionesPorZona(publicaciones, zonaCobertura) {
-  const zonas = (zonaCobertura ?? '')
-    .split(',')
-    .map((z) => z.trim())
-    .filter(Boolean);
-  if (zonas.length === 0) return publicaciones;
-  return publicaciones.filter((p) => zonaCoincide(p.zona, zonas));
+  return filtrarPorZonaCobertura(publicaciones, zonaCobertura);
 }
 
 export async function fetchMisPublicaciones(autorId) {

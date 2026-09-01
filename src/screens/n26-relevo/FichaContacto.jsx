@@ -50,7 +50,13 @@ export default function FichaContacto({ ficha, cargando }) {
     return (
       <div className="flex flex-col gap-1.5 rounded-[10px] border border-[#E1E8ED] bg-[#F4F7F9] p-3">
         <div className="flex items-center gap-2">
-          <Avatar fotoUrl={ficha.foto_url} nombre={nombreClinica} size={36} />
+          <Avatar
+            fotoUrl={ficha.foto_url}
+            nombre={nombreClinica}
+            rol={ficha.rol}
+            semilla={ficha.id}
+            size={36}
+          />
           <div className="flex flex-col">
             <p className="text-[12px] font-semibold text-[#0A1628]">{nombreClinica}</p>
             <p className="text-[11px] text-[#5A6B7A]">Clínica veterinaria</p>

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { subscribeInserts, subscribeRow } from './chatRealtime';
+import { filtrarPorZonaCobertura } from './municipios';
 
 // N-32 · MUVET Auxiliar — médico↔auxiliar. Capa de acceso a datos.
 // Esquema, RLS, triggers y RPC en supabase/migrations/0028_apoyo_y_realtime_chats.sql.
@@ -214,20 +215,15 @@ export async function cancelarPublicacionApoyo(id, autorId) {
   if (error) throw error;
 }
 
-// Matching por zona, mismo criterio que filtrarPublicacionesPorZona en
-// lib/relevo.js: `zona_cobertura` del perfil es texto con zonas separadas por
-// coma y basta con que la publicación mencione cualquiera de las mías. Sin
-// zona configurada no se filtra nada.
+// Matching por zona. Decía "mismo criterio que filtrarPublicacionesPorZona en
+// lib/relevo.js" pero era una copia empobrecida: comparaba substrings a mano,
+// sin áreas metropolitanas (un médico en Envigado no veía a un auxiliar en
+// Bello), sin tolerar acentos ('medellin' contra 'Medellín') y descartando las
+// publicaciones sin zona declarada, que así no las veía nadie.
+//
+// Ahora es de verdad el mismo criterio: el único, en lib/municipios.js.
 export function filtrarPorZona(publicaciones, zonaCobertura) {
-  const zonas = (zonaCobertura ?? '')
-    .split(',')
-    .map((z) => z.trim())
-    .filter(Boolean);
-  if (zonas.length === 0) return publicaciones;
-  return publicaciones.filter((p) => {
-    const zonaPublicacion = (p.zona ?? '').toLowerCase();
-    return zonas.some((z) => zonaPublicacion.includes(z.toLowerCase()));
-  });
+  return filtrarPorZonaCobertura(publicaciones, zonaCobertura);
 }
 
 // ============================================================================

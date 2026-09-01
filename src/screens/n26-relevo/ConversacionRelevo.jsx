@@ -277,7 +277,13 @@ export default function ConversacionRelevo() {
         <Card className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Avatar fotoUrl={conversacion.otro?.foto_url} nombre={nombreOtro} size={36} />
+              <Avatar
+                fotoUrl={conversacion.otro?.foto_url}
+                nombre={nombreOtro}
+                rol={conversacion.otro?.rol}
+                semilla={conversacion.otro?.id}
+                size={36}
+              />
               <p className="text-[14px] font-semibold text-[#0A1628]">{nombreOtro}</p>
             </div>
             <Badge tone={estadoBadge.tone}>{estadoBadge.label}</Badge>

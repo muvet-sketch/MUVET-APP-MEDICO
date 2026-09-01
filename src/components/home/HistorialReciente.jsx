@@ -100,10 +100,21 @@ export default function HistorialReciente({ perfil }) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {/* `foto_url` solo llega para contrapartes de rol 'clinica'
-                        (perfiles_publico, 0035): si está, es el logo de la clínica. */}
-                    {item.raw?.otro?.foto_url && (
-                      <Avatar fotoUrl={item.raw.otro.foto_url} nombre={tituloDe(item)} size={24} />
+                    {/* Solo los dos orígenes de conversación tienen contraparte
+                        (ver tituloDe): en 'cobertura' el título es el tipo de
+                        servicio y en 'relevo_oferta' la publicación propia, así
+                        que ahí un avatar mostraría iniciales de un texto, no de
+                        una persona. `foto_url` llega solo para clínicas
+                        (perfiles_publico, 0035); médico y auxiliar caen a
+                        iniciales, ya con el color de su rol (lib/avatarColor.js). */}
+                    {item.raw?.otro && (
+                      <Avatar
+                        fotoUrl={item.raw.otro.foto_url}
+                        nombre={tituloDe(item)}
+                        rol={item.raw.otro.rol}
+                        semilla={item.raw.otro.id}
+                        size={24}
+                      />
                     )}
                     <p className="text-[14px] font-medium text-[#0A1628]">
                       <span aria-hidden="true">{ORIGEN_ICONO[item.origen]} </span>

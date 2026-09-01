@@ -218,7 +218,13 @@ export default function TabOfertas({ perfil, rolInicial }) {
             <Card key={p.id} className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Avatar fotoUrl={p.autor?.foto_url} nombre={nombreAutor} size={32} />
+                  <Avatar
+                    fotoUrl={p.autor?.foto_url}
+                    nombre={nombreAutor}
+                    rol={p.autor?.rol}
+                    semilla={p.autor?.id}
+                    size={32}
+                  />
                   <p className="text-[14px] font-semibold text-[#0A1628]">{nombreAutor}</p>
                 </div>
                 <Badge tone={badge.tone}>{badge.label}</Badge>

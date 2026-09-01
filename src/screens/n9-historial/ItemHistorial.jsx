@@ -199,7 +199,13 @@ export default function ItemHistorial({ item, perfilId }) {
     <Card className="flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Avatar fotoUrl={raw.otro?.foto_url} nombre={nombreOtro} size={32} />
+          <Avatar
+            fotoUrl={raw.otro?.foto_url}
+            nombre={nombreOtro}
+            rol={raw.otro?.rol}
+            semilla={raw.otro?.id}
+            size={32}
+          />
           <p className="text-[14px] font-medium text-[#0A1628]">{nombreOtro}</p>
         </div>
         <div className="flex flex-col items-end gap-1">

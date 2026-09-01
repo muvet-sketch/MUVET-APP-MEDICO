@@ -82,6 +82,10 @@ export async function fetchServiciosAceptados(perfilId) {
       // Solo MUVET Turnos tiene clínicas (y `perfiles_publico` solo expone el
       // logo para rol 'clinica', 0035); en los otros dos módulos no hay logo.
       fotoUrl: null,
+      // Sin logo el avatar cae a iniciales, y su color sale del rol + el id de
+      // la contraparte (lib/avatarColor.js).
+      rolContraparte: c.otro?.rol ?? null,
+      idContraparte: c.otro?.id ?? null,
       subtitulo: labelSubtipo(c.servicio_subtipo),
       direccion: direccionesApoyo[i]?.direccion_encuentro ?? null,
       referencia: direccionesApoyo[i]?.referencia ?? null,
@@ -99,6 +103,8 @@ export async function fetchServiciosAceptados(perfilId) {
       // Logo de la clínica (0035): `perfiles_publico` lo trae solo para rol
       // 'clinica'; entre médico y auxiliar llega null y el avatar cae a iniciales.
       fotoUrl: c.otro?.foto_url ?? null,
+      rolContraparte: c.otro?.rol ?? null,
+      idContraparte: c.otro?.id ?? null,
       subtitulo: c.publicacion?.descripcion || '(sin descripción)',
       // 0030: la dirección sale de la SEDE que eligió la oferta, no del perfil.
       // Solo la clínica tiene sede; entre médico y auxiliar no hay dirección
@@ -119,6 +125,9 @@ export async function fetchServiciosAceptados(perfilId) {
         (s.autor_id === perfilId ? s.cobertura?.nombre_completo : s.autor?.nombre_completo) ||
         'Usuario MUVET',
       fotoUrl: null,
+      // N-30 es médico↔médico: la contraparte es el otro lado de la solicitud.
+      rolContraparte: (s.autor_id === perfilId ? s.cobertura?.rol : s.autor?.rol) ?? null,
+      idContraparte: (s.autor_id === perfilId ? s.cobertura?.id : s.autor?.id) ?? null,
       subtitulo: s.tipo_servicio || '(sin tipo de servicio)',
       direccion: direccionesCobertura[i]?.direccion_encuentro ?? null,
       referencia: direccionesCobertura[i]?.referencia ?? s.zona ?? null,

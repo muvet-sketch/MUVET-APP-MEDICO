@@ -71,7 +71,13 @@ export default function ServiciosAceptados({ perfil }) {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Avatar fotoUrl={item.fotoUrl} nombre={item.titulo} size={28} />
+                  <Avatar
+                    fotoUrl={item.fotoUrl}
+                    nombre={item.titulo}
+                    rol={item.rolContraparte}
+                    semilla={item.idContraparte}
+                    size={28}
+                  />
                   <p className="text-[14px] font-semibold text-[#0A1628]">
                     <span aria-hidden="true">{item.icono} </span>
                     {item.titulo}
