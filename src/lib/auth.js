@@ -1,7 +1,16 @@
 import { supabase } from './supabase';
 
 export async function signUpWithEmail(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    // El Site URL de Supabase Auth es global al proyecto y se compartirá con
+    // la futura App Tutor (mismo backend). Cada frontend declara su propio
+    // destino para que el enlace de confirmación vuelva siempre a la app
+    // desde la que se registró el usuario — mismo patrón que
+    // sendPasswordReset().
+    options: { emailRedirectTo: `${window.location.origin}/login` },
+  });
   if (error) throw error;
   return data;
 }

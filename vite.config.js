@@ -24,6 +24,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
+        // Identidad explícita de la PWA ahora que vive en su propio origen
+        // (app.appmuvet.com): id fija la identidad de instalación y scope el
+        // alcance del service worker, en vez de dejarlos inferidos.
+        id: '/',
+        scope: '/',
         name: 'MUVET App Médico',
         short_name: 'MUVET',
         description: 'App de trabajo del médico veterinario en campo — MUVET.',
