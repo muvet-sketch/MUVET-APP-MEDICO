@@ -32,13 +32,31 @@ export function AuthProvider({ children }) {
         setSession(s);
         await loadPerfil(s?.user?.id);
       })
+      .catch((err) => {
+        // Si no se puede resolver la sesión (backend caído, red, token
+        // corrupto en storage), se degrada explícitamente a "no autenticado":
+        // ProtectedRoute manda a /login y la app sigue usable. Sin este catch
+        // el rechazo quedaba sin manejar y el estado se quedaba a medias —
+        // p. ej. una sesión ya asignada con el perfil sin cargar.
+        if (!active) return;
+        console.error('No se pudo recuperar la sesión:', err);
+        setSession(null);
+        setPerfil(null);
+      })
       .finally(() => {
         if (active) setLoading(false);
       });
 
     const subscription = onAuthStateChange(async (s) => {
       setSession(s);
-      await loadPerfil(s?.user?.id);
+      try {
+        await loadPerfil(s?.user?.id);
+      } catch (err) {
+        // Mismo criterio que arriba: un fallo al traer el perfil no puede
+        // dejar un rechazo suelto en un callback del que nadie hace await.
+        console.error('No se pudo cargar el perfil:', err);
+        setPerfil(null);
+      }
     });
 
     return () => {

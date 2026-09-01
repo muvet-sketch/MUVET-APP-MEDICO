@@ -4,6 +4,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Solo desarrollo: sin esto Vite escucha únicamente en 127.0.0.1 y la app no
+  // es alcanzable desde otro dispositivo de la red (localhost en el otro
+  // equipo apunta a ese equipo, no a este). Con host: true, `npm run dev`
+  // imprime una URL "Network:" del tipo http://192.168.x.x:5173 que sí sirve
+  // para probar en un móvil de la misma Wi-Fi.
+  //
+  // No reemplaza al dominio desplegado: sobre http:// + IP la PWA no es
+  // instalable. Para uso real multi-dispositivo, el canal es
+  // https://app.appmuvet.com.
+  server: { host: true },
   plugins: [
     react(),
     // Fase 7, Acción 11. Librería nueva autorizada explícitamente por el
