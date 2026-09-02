@@ -12,9 +12,11 @@ const ROLES = [
   { value: 'clinica', label: 'Clínica Veterinaria' },
 ];
 
-export default function ActorProfileForm({ userId, onProfileCreated }) {
+export default function ActorProfileForm({ userId, onProfileCreated, nombreSugerido = '' }) {
   const [rol, setRol] = useState('');
-  const [nombreCompleto, setNombreCompleto] = useState('');
+  // Precargado desde el proveedor de SSO cuando lo hay (Google manda el nombre
+  // en user_metadata); vacío y editable en el registro por correo.
+  const [nombreCompleto, setNombreCompleto] = useState(nombreSugerido);
   const [telefono, setTelefono] = useState('');
   const [zonaCobertura, setZonaCobertura] = useState('');
   const [especialidad, setEspecialidad] = useState('');

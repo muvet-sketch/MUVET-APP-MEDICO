@@ -56,8 +56,17 @@ export default function N1Login() {
           onBackToLogin={() => setStep('login')}
         />
       )}
+      {/* Paso 2 del registro. Se llega por dos caminos: el registro por correo
+          (SignupCredentialsForm) y el SSO de Google, que crea el usuario de Auth
+          pero no la fila de `perfiles`. En el segundo, Google ya nos dio el
+          nombre en user_metadata y se precarga para que solo haya que
+          confirmarlo. */}
       {step === 'signup-profile' && session && (
-        <ActorProfileForm userId={session.user.id} onProfileCreated={handleProfileCreated} />
+        <ActorProfileForm
+          userId={session.user.id}
+          nombreSugerido={session.user.user_metadata?.full_name ?? session.user.user_metadata?.name ?? ''}
+          onProfileCreated={handleProfileCreated}
+        />
       )}
       {step === 'signup-profile' && !session && (
         // SUPUESTO: si la confirmación de correo está activa en Supabase Auth, no hay sesión
