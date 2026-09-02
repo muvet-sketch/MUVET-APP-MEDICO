@@ -1,7 +1,47 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Las UIs de variables de entorno (Vercel entre ellas) aceptan que se pegue la
+// línea ENTERA del .env dentro del campo "value", con el `NOMBRE=` incluido.
+// Eso ya rompió producción una vez: el bundle desplegado en app.appmuvet.com
+// llevaba como anon key el literal
+//
+//   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs…
+//
+// y el gateway de Supabase respondía 401 «Invalid API key» a cada login,
+// mientras en local —que lee el .env de verdad, donde ese prefijo es la clave
+// y no el valor— todo funcionaba. Un fallo que solo aparece desplegado y con
+// un mensaje que apunta a la key equivocada.
+//
+// Se normaliza acá, en el único punto donde las variables entran a la app: se
+// quitan espacios, comillas envolventes y el prefijo `NOMBRE=` si viene pegado.
+// No es silencioso — cada corrección se avisa por consola, porque el valor mal
+// cargado en el panel de despliegue hay que arreglarlo igual.
+function leerVariable(nombre, valorCrudo) {
+  if (typeof valorCrudo !== 'string') return '';
+
+  let valor = valorCrudo.trim();
+
+  // Dos pasadas: cubre tanto `"VITE_X=eyJ…"` como `VITE_X="eyJ…"`.
+  for (let i = 0; i < 2; i += 1) {
+    if (valor.length >= 2 && (valor[0] === '"' || valor[0] === "'") && valor.at(-1) === valor[0]) {
+      valor = valor.slice(1, -1).trim();
+      console.warn(`${nombre}: se ignoraron las comillas envolventes del valor.`);
+    }
+    if (valor.startsWith(`${nombre}=`)) {
+      valor = valor.slice(nombre.length + 1).trim();
+      console.warn(
+        `${nombre}: el valor traía el prefijo "${nombre}=" pegado adelante y se descartó. ` +
+          'Corrige la variable en el entorno de despliegue: el campo "value" lleva SOLO el ' +
+          'valor, no la línea completa del .env.',
+      );
+    }
+  }
+
+  return valor;
+}
+
+const supabaseUrl = leerVariable('VITE_SUPABASE_URL', import.meta.env.VITE_SUPABASE_URL);
+const supabaseAnonKey = leerVariable('VITE_SUPABASE_ANON_KEY', import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 // Las VITE_* se inlinean en tiempo de build: si el entorno de despliegue no las
 // tiene cargadas, el bundle de producción queda con `undefined` acá. Antes eso
