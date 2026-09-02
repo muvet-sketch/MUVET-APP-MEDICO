@@ -3,6 +3,7 @@ import { ScreenHeader, BottomNav } from '../../components/ui';
 import HeaderPerfil from './HeaderPerfil';
 import DatosProfesionalesSection from './DatosProfesionalesSection';
 import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
+import EspecialidadesPerfilSection from '../../components/EspecialidadesPerfilSection';
 import MetodosPagoSection from '../../components/MetodosPagoSection';
 import MatriculaSection from './MatriculaSection';
 import CalificacionSection from './CalificacionSection';
@@ -27,6 +28,9 @@ export default function N8PerfilMedico() {
         <DatosProfesionalesSection />
         <MetodosPagoSection />
         <HabilidadesPerfilSection />
+        {/* 0039: va justo ANTES de la matrícula a propósito — cuando falta
+            validarla, el aviso de "Sin listar" apunta a la tarjeta siguiente. */}
+        <EspecialidadesPerfilSection />
         <MatriculaSection />
         <CalificacionSection />
         <NotificacionesSection />

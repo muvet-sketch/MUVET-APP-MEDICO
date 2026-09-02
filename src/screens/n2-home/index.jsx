@@ -12,6 +12,7 @@ import ValidationBadge from './ValidationBadge';
 import QuickAccess from './QuickAccess';
 import OfertasRecientes from '../../components/home/OfertasRecientes';
 import ApoyoDisponibles from '../../components/home/ApoyoDisponibles';
+import EspecialistasPreview from '../../components/home/EspecialistasPreview';
 import RelevosDisponibles from '../../components/home/RelevosDisponibles';
 import MisPublicaciones from '../../components/home/MisPublicaciones';
 import HistorialReciente from '../../components/home/HistorialReciente';
@@ -164,6 +165,11 @@ export default function N2Home() {
       <RelevosDisponibles perfil={perfil} />
 
       <ApoyoDisponibles perfil={perfil} />
+
+      {/* N-35 (0039): el médico no tiene pestaña en la barra inferior para este
+          módulo (está llena con los otros tres), así que la Home y el menú
+          hamburguesa son sus dos accesos. */}
+      <EspecialistasPreview perfil={perfil} />
 
       <HistorialReciente perfil={perfil} />
 

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { CORTO_AUXILIAR, CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
+import { CORTO_AUXILIAR, CORTO_ESPECIALISTAS, CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
 
 // N-31 · Notificaciones. Capa de acceso a la tabla `notificaciones`
 // (migración 0026): una fila por evento, escrita por triggers del backend
@@ -32,6 +32,7 @@ export const FAMILIAS_NOTIFICACION = [
   { value: 'relevo', label: CORTO_TURNOS },
   { value: 'cobertura', label: CORTO_RELEVO },
   { value: 'apoyo', label: CORTO_AUXILIAR },
+  { value: 'especialista', label: CORTO_ESPECIALISTAS },
 ];
 
 // Presentación por tipo (los mismos valores del CHECK de 0026 + 0027). Los
@@ -65,6 +66,14 @@ const PRESENTACION = {
   apoyo_descartada: { icono: '✖️', familia: 'apoyo' },
   apoyo_finalizada: { icono: '🏁', familia: 'apoyo' },
   apoyo_pago: { icono: '💳', familia: 'apoyo' }, // 0029
+  // MUVET Especialistas (0039). Sin `_pago`: acá el especialista le cobra
+  // directo a quien lo contrata, no hay pago entre las partes que marcar.
+  especialista_contacto: { icono: '💬', familia: 'especialista' },
+  especialista_mensaje: { icono: '💬', familia: 'especialista' },
+  especialista_acuerdo: { icono: '🤝', familia: 'especialista' },
+  especialista_confirmada: { icono: '✅', familia: 'especialista' },
+  especialista_descartada: { icono: '✖️', familia: 'especialista' },
+  especialista_finalizada: { icono: '🏁', familia: 'especialista' },
 };
 
 const PRESENTACION_DEFECTO = { icono: '🔔', familia: '' };

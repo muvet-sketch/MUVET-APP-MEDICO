@@ -6,13 +6,16 @@ import { enlaceUbicacion } from '../../lib/mapas';
 import { chatAbierto, fetchDireccionCobertura, textoVentanaChat } from '../../lib/coberturaServicio';
 import {
   NOMBRE_AUXILIAR,
+  NOMBRE_ESPECIALISTAS,
   NOMBRE_RELEVO,
   NOMBRE_TURNOS,
   ICONO_AUXILIAR,
+  ICONO_ESPECIALISTAS,
   ICONO_RELEVO,
   ICONO_TURNOS,
 } from '../../lib/nombresModulos';
 import { labelSubtipo } from '../../lib/apoyo';
+import { asuntoConversacion } from '../../lib/especialistas';
 import SolicitudCard from '../n30-cobertura-servicio/SolicitudCard';
 
 // Badge de estado de pago (migración 0029). Solo tiene sentido en un servicio
@@ -35,6 +38,7 @@ const ORIGEN_LABEL = {
   relevo_oferta: `${ICONO_TURNOS} ${NOMBRE_TURNOS} · mi oferta`,
   relevo_conversacion: `${ICONO_TURNOS} ${NOMBRE_TURNOS} · conversación`,
   apoyo_conversacion: `${ICONO_AUXILIAR} ${NOMBRE_AUXILIAR} · servicio`,
+  especialista_conversacion: `${ICONO_ESPECIALISTAS} ${NOMBRE_ESPECIALISTAS} · servicio`,
 };
 
 const ESTADO_OFERTA_BADGE = {
@@ -180,6 +184,46 @@ export default function ItemHistorial({ item, perfilId }) {
         <button
           type="button"
           onClick={() => navigate(`/apoyo/conversacion/${raw.id}`)}
+          className="self-start text-[12px] font-medium text-[#1A7A5E]"
+        >
+          Ver conversación →
+        </button>
+        <OrigenTag origen={origen} fecha={fecha} />
+      </Card>
+    );
+  }
+
+  // especialista_conversacion — un servicio de MUVET Especialistas ya cerrado
+  // (0039), venga del directorio o del tablón. Como en Auxiliar, el chat y sus
+  // adjuntos NO se borraron: el enlace abre el hilo completo en solo lectura.
+  //
+  // Sin PagoBadge a propósito: este módulo no tiene control de pagos (el
+  // especialista le cobra directo a quien lo contrata).
+  if (origen === 'especialista_conversacion') {
+    const badgeEsp = ESTADO_CONVERSACION_BADGE[raw.estado] ?? { label: raw.estado, tone: 'neutral' };
+    const nombre = raw.otro?.nombre_completo || raw.otro?.razon_social || 'Usuario MUVET';
+    return (
+      <Card className="flex flex-col gap-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Avatar
+              fotoUrl={raw.otro?.foto_url}
+              nombre={nombre}
+              rol={raw.otro?.rol}
+              semilla={raw.otro?.id}
+              size={32}
+            />
+            <p className="text-[14px] font-medium text-[#0A1628]">{nombre}</p>
+          </div>
+          <Badge tone={badgeEsp.tone}>{badgeEsp.label}</Badge>
+        </div>
+        <p className="text-[12px] text-[#5A6B7A]">
+          {raw.origen === 'directorio' ? 'Desde el directorio' : 'Desde el tablón de ofertas'} ·{' '}
+          {asuntoConversacion(raw)}
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate(`/especialistas/conversacion/${raw.id}`)}
           className="self-start text-[12px] font-medium text-[#1A7A5E]"
         >
           Ver conversación →

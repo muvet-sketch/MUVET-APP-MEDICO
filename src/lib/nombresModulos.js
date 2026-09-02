@@ -1,10 +1,11 @@
-// Nombres visibles de los TRES módulos gremiales.
+// Nombres visibles de los CUATRO módulos gremiales.
 //
-// ⚠️ LEER ANTES DE TOCAR CUALQUIER COSA DE ESTOS TRES MÓDULOS ⚠️
+// ⚠️ LEER ANTES DE TOCAR CUALQUIER COSA DE LOS TRES PRIMEROS ⚠️
 //
-// Ninguno de los tres tiene un identificador de código igual a su nombre
-// visible. Los dos primeros porque los nombres se intercambiaron y no se
+// Ninguno de los tres primeros tiene un identificador de código igual a su
+// nombre visible. Los dos primeros porque los nombres se intercambiaron y no se
 // renombró el código; el tercero porque su nombre natural ya estaba ocupado.
+// El cuarto sí coincide: nació con su nombre definitivo.
 //
 //   UI "MUVET Turnos"    →  ruta /relevo              →  lib/relevo.js,
 //                                                        tablas relevo_*,
@@ -17,6 +18,11 @@
 //   UI "MUVET Auxiliar"  →  ruta /apoyo               →  lib/apoyo.js,
 //                                                        tablas apoyo_*,
 //                                                        notificaciones apoyo_*
+//
+//   UI "MUVET Especialistas" → ruta /especialistas    →  lib/especialistas.js,
+//                                                        tablas especialista_*,
+//                                                        notificaciones especialista_*
+//                                                        (este SÍ coincide)
 //
 // Los dos primeros: los nombres de cara al usuario se intercambiaron, pero los
 // IDENTIFICADORES de código NO. "Relevo" pasó al módulo que de verdad es un
@@ -58,3 +64,17 @@ export const CORTO_RELEVO = 'Relevo';
 export const NOMBRE_AUXILIAR = 'MUVET Auxiliar';
 export const ICONO_AUXILIAR = '🧰';
 export const CORTO_AUXILIAR = 'Auxiliar';
+
+// Directorio de médicos especialistas + tablón de ofertas (N-35, migración
+// 0039). Identificador interno: `especialista`.
+//
+// ✅ Este es el ÚNICO de los cuatro cuyo identificador coincide con el nombre
+// visible: ruta /especialistas, tablas especialista_*, lib/especialistas.js.
+// Se nombró así a propósito para no sumar una cuarta discordancia.
+//
+// ⚠️ No confundir `especialista` (el módulo) con `perfiles.especialidades` (la
+// columna del catálogo) ni con `perfiles.especialidad` (el texto libre viejo de
+// 0001, que sigue vivo y lo leen las fichas de Turnos y Auxiliar).
+export const NOMBRE_ESPECIALISTAS = 'MUVET Especialistas';
+export const ICONO_ESPECIALISTAS = '🩺';
+export const CORTO_ESPECIALISTAS = 'Especialistas';

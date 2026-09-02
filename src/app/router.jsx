@@ -26,6 +26,8 @@ import ChatCobertura from '../screens/n30-cobertura-servicio/ChatCobertura';
 import N31Notificaciones from '../screens/n31-notificaciones';
 import N32Auxiliar from '../screens/n32-auxiliar';
 import ConversacionApoyo from '../screens/n32-auxiliar/ConversacionApoyo';
+import N35Especialistas from '../screens/n35-especialistas';
+import ConversacionEspecialista from '../screens/n35-especialistas/ConversacionEspecialista';
 import Soporte from '../screens/soporte';
 import N33Mejoras from '../screens/n33-mejoras';
 import N34Mensajes from '../screens/n34-mensajes';
@@ -124,6 +126,20 @@ export default function AppRouter() {
           Solo médico y auxiliar: la clínica no participa en este matching. */}
       <Route path="/apoyo" element={<ProtectedRoute allowedRoles={['medico', 'auxiliar']}><N32Auxiliar /></ProtectedRoute>} />
       <Route path="/apoyo/conversacion/:conversacionId" element={<ProtectedRoute allowedRoles={['medico', 'auxiliar']}><ConversacionApoyo /></ProtectedRoute>} />
+      {/* MUVET Especialistas (N-35, migración 0039): directorio de médicos
+          especialistas + tablón de ofertas.
+          ✅ A diferencia de los otros tres módulos gremiales, acá la ruta, las
+          tablas y el nombre visible SÍ coinciden (ver lib/nombresModulos.js).
+          Abierta a los 3 actores, pero cada uno ve cosas distintas y eso NO lo
+          decide el router: el médico y la clínica ven el directorio (lo cierra
+          el WHERE de la vista `especialistas_directorio`), el auxiliar solo
+          publica en el tablón, y responder ofertas exige estar en el directorio
+          (policy de insert de `especialista_conversaciones`).
+          El hilo va en ruta propia para que las notificaciones de 0039 puedan
+          hacer deep-link a una conversación concreta — mismo criterio que
+          /relevo/conversacion/:id y /apoyo/conversacion/:id. */}
+      <Route path="/especialistas" element={<ProtectedRoute><N35Especialistas /></ProtectedRoute>} />
+      <Route path="/especialistas/conversacion/:conversacionId" element={<ProtectedRoute><ConversacionEspecialista /></ProtectedRoute>} />
       {/* N-31: Notificaciones (migración 0026). Abierta a los 3 actores, igual
           que /relevo y /historial — las notificaciones de MUVET Turnos le
           llegan a cualquiera de ellos; las de MUVET Relevo (médico↔médico)

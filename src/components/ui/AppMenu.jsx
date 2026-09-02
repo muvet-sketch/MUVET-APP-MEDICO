@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { signOut } from '../../lib/auth';
+import { ICONO_ESPECIALISTAS, NOMBRE_ESPECIALISTAS } from '../../lib/nombresModulos';
 
 // Menú hamburguesa del header (0028). Nace porque la barra inferior se quedó
 // sin espacio: "MUVET Auxiliar" ocupa el cuarto lugar y "Perfil" se mudó acá,
@@ -59,6 +60,11 @@ export default function AppMenu() {
     navigate('/mensajes');
   }
 
+  function irAEspecialistas() {
+    setAbierto(false);
+    navigate('/especialistas');
+  }
+
   function irAlHistorial() {
     setAbierto(false);
     navigate('/historial');
@@ -94,6 +100,21 @@ export default function AppMenu() {
             className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
           >
             <span aria-hidden="true">👤</span> Mi perfil
+          </button>
+          <div className="h-px bg-[#E1E8ED]" />
+          {/* N-35 (0039): MUVET Especialistas es el CUARTO módulo gremial y la
+              barra inferior del médico ya está llena con los otros tres, así
+              que este es su único acceso — igual que Mensajes. Abierto a los
+              tres roles: el médico y la clínica buscan especialistas, el
+              auxiliar publica en el tablón. Qué ve cada uno lo deciden las
+              pestañas de N-35 y la RLS de 0039, no este menú. */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={irAEspecialistas}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
+          >
+            <span aria-hidden="true">{ICONO_ESPECIALISTAS}</span> {NOMBRE_ESPECIALISTAS}
           </button>
           <div className="h-px bg-[#E1E8ED]" />
           {/* N-34: para el médico este es el ÚNICO acceso a Mensajes — su barra

@@ -29,10 +29,17 @@ import {
   tieneNoLeidosApoyo,
 } from './apoyo';
 import {
+  ESTADOS_ABIERTOS_ESPECIALISTA,
+  fetchMisConversacionesEspecialista,
+  tieneNoLeidosEspecialista,
+} from './especialistas';
+import {
   CORTO_AUXILIAR,
+  CORTO_ESPECIALISTAS,
   CORTO_RELEVO,
   CORTO_TURNOS,
   ICONO_AUXILIAR,
+  ICONO_ESPECIALISTAS,
   ICONO_RELEVO,
   ICONO_TURNOS,
 } from './nombresModulos';
@@ -48,6 +55,7 @@ export const MODULOS_MENSAJES = {
   relevo: { label: CORTO_TURNOS, icono: ICONO_TURNOS },
   cobertura: { label: CORTO_RELEVO, icono: ICONO_RELEVO },
   apoyo: { label: CORTO_AUXILIAR, icono: ICONO_AUXILIAR },
+  especialista: { label: CORTO_ESPECIALISTAS, icono: ICONO_ESPECIALISTAS },
 };
 
 export function nombreContacto(otro) {
@@ -127,6 +135,26 @@ function normalizarApoyo(conversaciones, perfilId) {
   );
 }
 
+// MUVET Especialistas (N-35, 0039). Las DOS mitades del módulo (directorio y
+// tablón) salen por acá: son la misma conversación con distinto `origen`, y
+// para una bandeja agrupada por persona esa diferencia no cambia nada. El chat
+// y sus adjuntos nunca se purgan.
+function normalizarEspecialista(conversaciones, perfilId) {
+  return conversaciones.map((c) =>
+    normalizar({
+      origen: 'especialista',
+      raw: c,
+      otro: c.otro,
+      estado: c.estado,
+      activa: ESTADOS_ABIERTOS_ESPECIALISTA.includes(c.estado),
+      fecha: c.ultimo_mensaje_at ?? c.created_at,
+      ruta: `/especialistas/conversacion/${c.id}`,
+      noLeido: tieneNoLeidosEspecialista(c, perfilId),
+      chatDisponible: true,
+    }),
+  );
+}
+
 // MUVET Relevo (N-30). No tiene tabla de conversaciones: la negociación vive en
 // la propia solicitud, y "el otro" es el autor o quien releva, según de qué
 // lado esté el perfil. Una solicitud 'abierta' todavía no tiene contraparte
@@ -163,12 +191,17 @@ function normalizarCobertura(solicitudes, perfilId) {
 // participa. No se piden las fuentes que el rol no puede ver: la RLS las
 // devolvería vacías igual, pero son viajes de red al pedo.
 async function fetchConversacionesUnificadas(perfilId, rol) {
-  const [conversaciones, conversacionesApoyo, coberturaActivas, coberturaHistorial] = await Promise.all([
-    fetchMisConversaciones(perfilId),
-    participaEnApoyo(rol) ? fetchMisConversacionesApoyo(perfilId) : Promise.resolve([]),
-    rol === 'medico' ? fetchMisSolicitudesActivas(perfilId) : Promise.resolve([]),
-    rol === 'medico' ? fetchHistorialCobertura(perfilId) : Promise.resolve([]),
-  ]);
+  // Especialistas va sin condición de rol: los tres pueden tener conversaciones
+  // ahí (médico y clínica contactan el directorio, el auxiliar recibe respuestas
+  // a sus ofertas del tablón).
+  const [conversaciones, conversacionesApoyo, conversacionesEspecialista, coberturaActivas, coberturaHistorial] =
+    await Promise.all([
+      fetchMisConversaciones(perfilId),
+      participaEnApoyo(rol) ? fetchMisConversacionesApoyo(perfilId) : Promise.resolve([]),
+      fetchMisConversacionesEspecialista(perfilId),
+      rol === 'medico' ? fetchMisSolicitudesActivas(perfilId) : Promise.resolve([]),
+      rol === 'medico' ? fetchHistorialCobertura(perfilId) : Promise.resolve([]),
+    ]);
 
   // Las dos consultas de cobertura son disjuntas por estado, pero salen en dos
   // viajes distintos: si una solicitud se finaliza justo entre ambas, aparece
@@ -181,6 +214,7 @@ async function fetchConversacionesUnificadas(perfilId, rol) {
   return [
     ...normalizarRelevo(conversaciones, perfilId),
     ...normalizarApoyo(conversacionesApoyo, perfilId),
+    ...normalizarEspecialista(conversacionesEspecialista, perfilId),
     ...normalizarCobertura([...porId.values()], perfilId),
   ];
 }

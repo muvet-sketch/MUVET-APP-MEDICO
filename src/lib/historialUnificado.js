@@ -20,7 +20,8 @@
 import { fetchHistorial } from './coberturaServicio';
 import { fetchMisPublicaciones, fetchMisConversaciones } from './relevo';
 import { fetchMisConversacionesApoyo } from './apoyo';
-import { CORTO_AUXILIAR, CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
+import { fetchMisConversacionesEspecialista } from './especialistas';
+import { CORTO_AUXILIAR, CORTO_ESPECIALISTAS, CORTO_RELEVO, CORTO_TURNOS } from './nombresModulos';
 
 // Estados terminales de cada fuente — lo que ya terminó y por eso es historial.
 const RELEVO_OFERTA_TERMINAL = ['cancelada', 'finalizada'];
@@ -29,6 +30,7 @@ const RELEVO_OFERTA_TERMINAL = ['cancelada', 'finalizada'];
 // está en 'aceptada' aparece en "Servicios aceptados" del Home, no acá.
 const RELEVO_CONVERSACION_TERMINAL = ['descartada', 'finalizada'];
 const APOYO_CONVERSACION_TERMINAL = ['descartada', 'finalizada'];
+const ESPECIALISTA_CONVERSACION_TERMINAL = ['descartada', 'finalizada'];
 
 // Los `value` son identificadores internos y no se tocan; solo cambian las
 // etiquetas. De ahí que 'cobertura' se muestre como "Relevo" y 'relevo' como
@@ -38,6 +40,7 @@ export const ORIGENES_HISTORIAL = [
   { value: 'cobertura', label: CORTO_RELEVO },
   { value: 'relevo', label: CORTO_TURNOS },
   { value: 'apoyo', label: CORTO_AUXILIAR },
+  { value: 'especialista', label: CORTO_ESPECIALISTAS },
 ];
 
 // `origen` distingue cómo se renderiza cada ítem (ver ItemHistorial.jsx);
@@ -50,12 +53,14 @@ function normalizar(origen, familia, fecha, raw) {
 // sobre tres fuentes, así que no hay forma de limitar antes sin desordenar el
 // cruce. Lo usa la vista previa del Home (últimos 3); N-9 la llama sin límite.
 export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
-  const [cobertura, publicaciones, conversaciones, conversacionesApoyo] = await Promise.all([
-    fetchHistorial(perfilId),
-    fetchMisPublicaciones(perfilId),
-    fetchMisConversaciones(perfilId),
-    fetchMisConversacionesApoyo(perfilId),
-  ]);
+  const [cobertura, publicaciones, conversaciones, conversacionesApoyo, conversacionesEspecialista] =
+    await Promise.all([
+      fetchHistorial(perfilId),
+      fetchMisPublicaciones(perfilId),
+      fetchMisConversaciones(perfilId),
+      fetchMisConversacionesApoyo(perfilId),
+      fetchMisConversacionesEspecialista(perfilId),
+    ]);
 
   const items = [
     // fetchHistorial ya filtra a estado in ('finalizada','cancelada'). Una
@@ -87,6 +92,14 @@ export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
     ...conversacionesApoyo
       .filter((c) => APOYO_CONVERSACION_TERMINAL.includes(c.estado))
       .map((c) => normalizar('apoyo_conversacion', 'apoyo', c.cerrada_at ?? c.ultimo_mensaje_at, c)),
+
+    // MUVET Especialistas (0039). Las dos mitades del módulo (directorio y
+    // tablón) llegan por la misma fuente: son la misma conversación, solo
+    // cambia su `origen`. Como en Auxiliar, el chat y sus adjuntos NO se
+    // borran, así que estos ítems se pueden abrir para releerlos.
+    ...conversacionesEspecialista
+      .filter((c) => ESPECIALISTA_CONVERSACION_TERMINAL.includes(c.estado))
+      .map((c) => normalizar('especialista_conversacion', 'especialista', c.cerrada_at ?? c.ultimo_mensaje_at, c)),
   ];
 
   const ordenados = items.sort((a, b) => new Date(b.fecha ?? 0) - new Date(a.fecha ?? 0));
@@ -101,6 +114,12 @@ export async function fetchHistorialUnificado(perfilId, { limite } = {}) {
 // cobra directamente al tutor, así que no hay pago entre las dos partes que
 // pueda estar pendiente. Sus filas siguen entrando al historial, pero nunca al
 // filtro de pagos.
+//
+// 'especialista' (MUVET Especialistas, 0039) queda fuera por lo mismo: el
+// especialista le cobra directo a quien lo contrata y el módulo no tiene
+// columnas `pago_*`. Si se agregara acá, `pago_estado` llegaría undefined y el
+// `?? 'pendiente'` de abajo marcaría como impagos servicios que la app nunca se
+// propuso cobrar.
 export function esServicioFinalizado(item) {
   if (item?.origen === 'relevo_conversacion' || item?.origen === 'apoyo_conversacion') {
     return item.raw?.estado === 'finalizada';

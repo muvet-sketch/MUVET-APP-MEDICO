@@ -13,7 +13,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { fetchMisPublicaciones, fetchMisConversaciones } from '../../lib/relevo';
 import { fetchMisPublicacionesApoyo, fetchMisConversacionesApoyo } from '../../lib/apoyo';
-import { CORTO_AUXILIAR, CORTO_TURNOS, NOMBRE_AUXILIAR, NOMBRE_TURNOS } from '../../lib/nombresModulos';
+import { fetchMisOfertasEspecialista, fetchMisConversacionesEspecialista } from '../../lib/especialistas';
+import {
+  CORTO_AUXILIAR,
+  CORTO_ESPECIALISTAS,
+  CORTO_TURNOS,
+  NOMBRE_AUXILIAR,
+  NOMBRE_ESPECIALISTAS,
+  NOMBRE_TURNOS,
+} from '../../lib/nombresModulos';
 import { Card, Button, BottomNav, NotificationBell, AppMenu } from '../../components/ui';
 import OfertasRecientes from '../../components/home/OfertasRecientes';
 import ApoyoDisponibles from '../../components/home/ApoyoDisponibles';
@@ -36,6 +44,8 @@ export default function N28HomeSimplificado() {
     turnosConversaciones: 0,
     apoyoPubs: 0,
     apoyoConversaciones: 0,
+    especialistasOfertas: 0,
+    especialistasConversaciones: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -54,13 +64,17 @@ export default function N28HomeSimplificado() {
 
     // allSettled: que falle MUVET Auxiliar no debe dejar en blanco los
     // contadores de MUVET Turnos, ni al revés.
+    // La clínica no publica en el tablón de N-35 (solo busca en el directorio),
+    // así que sus ofertas propias no se piden.
     Promise.allSettled([
       fetchMisPublicaciones(perfil.id),
       fetchMisConversaciones(perfil.id),
       esAuxiliar ? fetchMisPublicacionesApoyo(perfil.id) : vacio,
       esAuxiliar ? fetchMisConversacionesApoyo(perfil.id) : vacio,
+      esAuxiliar ? fetchMisOfertasEspecialista(perfil.id) : vacio,
+      fetchMisConversacionesEspecialista(perfil.id),
     ])
-      .then(([turnosPubs, turnosConv, apoyoPubs, apoyoConv]) => {
+      .then(([turnosPubs, turnosConv, apoyoPubs, apoyoConv, espOfertas, espConv]) => {
         if (!active) return;
         const filas = (r) => (r.status === 'fulfilled' ? r.value ?? [] : []);
         // Solo las vivas: una negociación cerrada ya no es algo que atender.
@@ -70,6 +84,8 @@ export default function N28HomeSimplificado() {
           turnosConversaciones: abiertas(filas(turnosConv)),
           apoyoPubs: filas(apoyoPubs).filter((p) => p.activa && p.estado === 'abierta').length,
           apoyoConversaciones: abiertas(filas(apoyoConv)),
+          especialistasOfertas: filas(espOfertas).filter((o) => o.activa && o.estado === 'abierta').length,
+          especialistasConversaciones: abiertas(filas(espConv)),
         });
       })
       .finally(() => {
@@ -131,6 +147,27 @@ export default function N28HomeSimplificado() {
         </Card>
       )}
 
+      {/* MUVET Especialistas (N-35, 0039). Los dos roles entran, a cosas
+          distintas: la clínica busca especialistas en el directorio (no publica
+          en el tablón, de ahí que no se le cuenten ofertas propias) y el
+          auxiliar publica para que los especialistas lo encuentren. Qué ve cada
+          uno lo deciden las pestañas de N-35 y la RLS de 0039. */}
+      <Card className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[14px] font-semibold text-[#0A1628]">{NOMBRE_ESPECIALISTAS}</p>
+          <p className="text-[12px] text-[#5A6B7A]">
+            {loading
+              ? 'Cargando…'
+              : esClinica
+                ? `Busca especialistas · ${contadores.especialistasConversaciones} conversación(es) abierta(s)`
+                : `${contadores.especialistasOfertas} oferta(s) activa(s) · ${contadores.especialistasConversaciones} conversación(es) abierta(s)`}
+          </p>
+        </div>
+        <Button variant="outline" fullWidth={false} onClick={() => navigate('/especialistas')}>
+          {`Ir a ${CORTO_ESPECIALISTAS}`}
+        </Button>
+      </Card>
+
       {/* Lo acordado que sigue en curso: con quién, dónde, y la puerta al
           chat (0028). El auxiliar ve Turnos + Auxiliar; la clínica solo
           Turnos, que es el único módulo en el que participa. */}
@@ -145,6 +182,11 @@ export default function N28HomeSimplificado() {
       <OfertasRecientes perfil={perfil} />
 
       {!esClinica && <ApoyoDisponibles perfil={perfil} />}
+
+      {/* N-35 no tiene vista previa acá: su tarjeta de módulo está arriba, con
+          las de Turnos y Auxiliar. Un directorio no caduca —a diferencia de los
+          tablones— así que listar tres fichas sueltas no aportaría nada que la
+          tarjeta de arriba no diga ya. */}
 
       <HistorialReciente perfil={perfil} />
 

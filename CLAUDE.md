@@ -126,25 +126,38 @@ Nomenclatura canónica. Prohibido inventar términos alternativos.
   el MVP.** No existen ZamenIA, Hermes, Hugin, HygeIA como sistemas de este
   producto.
 - **Pasarela de pagos futura:** Siigo Pay (nunca Wompi). No entra en el MVP.
-- **⚠️ Los dos módulos gremiales — nombres visibles ≠ identificadores.** Los
-  nombres se intercambiaron y el código NO se renombró. Antes de escribir una
-  línea sobre cualquiera de los dos, leer `src/lib/nombresModulos.js`:
+- **⚠️ Los CUATRO módulos gremiales — nombres visibles ≠ identificadores.** En
+  los tres primeros los nombres se intercambiaron o quedaron ocupados y el
+  código NO se renombró. Antes de escribir una línea sobre cualquiera de ellos,
+  leer `src/lib/nombresModulos.js`:
 
   | UI | Pantalla | Ruta | Lib / tablas |
   |---|---|---|---|
   | **MUVET Turnos** — bolsa gremial multi-rol | N-26 | `/relevo` | `lib/relevo.js`, `relevo_*` |
   | **MUVET Relevo** — médico↔médico, pasar un servicio | N-30 | `/cobertura-servicio` | `lib/coberturaServicio.js`, `cobertura_*` |
-  | **MUVET Auxiliar** / apoyo / /apoyo |
-
+  | **MUVET Auxiliar** — médico↔auxiliar | N-32 | `/apoyo` | `lib/apoyo.js`, `apoyo_*` |
+  | **MUVET Especialistas** — directorio + tablón | N-35 | `/especialistas` | `lib/especialistas.js`, `especialista_*` |
 
   Un chip etiquetado "Relevo" cuyo `value` es `'cobertura'` **es correcto**.
   Nombres anteriores, ya retirados de la UI: "MUVET Relevo" para N-26 y
   "Cobertura de Servicio" para N-30.
+
+  ✅ **MUVET Especialistas es la excepción**: es el único de los cuatro cuyo
+  identificador interno coincide con su nombre visible. Nació con su nombre
+  definitivo, así que no hay discordancia que recordar.
+
+  ⚠️ En N-32 el identificador es `apoyo` y **no** `auxiliar`, porque `auxiliar`
+  ya es un valor de `perfiles.rol`. Son tres cosas distintas: `apoyo` (el
+  módulo), "MUVET Auxiliar" (su nombre visible) y `'auxiliar'` (el rol).
+- **Especialidades vs. especialidad.** `perfiles.especialidades` (plural,
+  `text[]`, migración 0039) es el catálogo cerrado de
+  `src/lib/especialidades.js` que alimenta el directorio de N-35.
+  `perfiles.especialidad` (singular, texto libre, 0001) es el campo viejo, sigue
+  vivo y lo leen las fichas de N-26 y N-32. No se migró uno al otro.
 - **"Constelación"** = interfaz durante la consulta activa (pantalla N-4).
 - **"Barra Trueta"** = barra de navegación persistente de la Constelación. Es
   un **componente**, no una pantalla independiente.
 - **"Tutor"** = dueño de la mascota. Nunca usar "propietario" en la UI.
-- MUVET Auxiliar / apoyo / /apoyo
 
 
 ---
