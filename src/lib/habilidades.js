@@ -4,9 +4,9 @@ import { supabase } from './supabase';
 // Definidos por el fundador — no inventar, reordenar ni traducir entradas.
 //
 // Quién las usa:
-// - médico y auxiliar: las configuran en su perfil (N-8 · PerfilAuxiliarInline)
-//   y/o al editar su oferta; quedan activas en la publicación cada vez que la
-//   crean o la activan.
+// - médico y auxiliar: las configuran en su perfil (N-8 · médico, N-28 Perfil
+//   Auxiliar) y/o al editar su oferta; quedan activas en la publicación cada
+//   vez que la crean o la activan.
 // - clínica: NO tiene habilidades de perfil. Las selecciona solo dentro de su
 //   oferta, como las que espera del candidato que vea o acepte la publicación.
 export const HABILIDADES_PROFESIONALES = [

@@ -3,13 +3,14 @@
 // (D-543).
 //
 // Mismo orden que la Home del médico (N-2): módulos → lo mío → tablones →
-// historial. El botón "👤 Mi perfil" que había aquí desapareció: el perfil se
-// alcanza por la pestaña de la barra inferior en los dos roles.
+// historial. El perfil del auxiliar ya no vive aquí: tiene pantalla propia
+// (N-28 Perfil Auxiliar, ruta /perfil-auxiliar), igual que médico y clínica.
+// Se llega por "Mi perfil" del menú hamburguesa.
 //
 // El auxiliar participa en DOS módulos (MUVET Turnos y MUVET Auxiliar) y la
 // clínica solo en uno, así que todo lo de /apoyo va tras `!esClinica`.
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { fetchMisPublicaciones, fetchMisConversaciones } from '../../lib/relevo';
 import { fetchMisPublicacionesApoyo, fetchMisConversacionesApoyo } from '../../lib/apoyo';
@@ -28,14 +29,10 @@ import ApoyoDisponibles from '../../components/home/ApoyoDisponibles';
 import MisPublicaciones from '../../components/home/MisPublicaciones';
 import HistorialReciente from '../../components/home/HistorialReciente';
 import ServiciosAceptados from '../../components/home/ServiciosAceptados';
-import PerfilAuxiliarInline from './PerfilAuxiliarInline';
-import HabilidadesPerfilSection from '../../components/HabilidadesPerfilSection';
-import MetodosPagoSection from '../../components/MetodosPagoSection';
 
 export default function N28HomeSimplificado() {
   const { perfil } = useAuth();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   // Contadores del subtítulo de cada tarjeta de módulo. El listado de "Mis
   // publicaciones" ya no sale de acá: lo trae su propio componente, que además
   // cubre los tres módulos y deja activar/pausar desde la Home.
@@ -48,13 +45,6 @@ export default function N28HomeSimplificado() {
     especialistasConversaciones: 0,
   });
   const [loading, setLoading] = useState(true);
-
-  // El panel de perfil del auxiliar se abre y se cierra desde la URL, no desde
-  // un estado propio: la pestaña "Perfil" de la barra inferior navega a
-  // /home-simplificado?perfil=1 y, estando ya en esta pantalla, eso cambia el
-  // search param SIN remontar el componente. Derivarlo aquí es lo que hace que
-  // el panel abra también en ese caso.
-  const mostrarPerfil = searchParams.get('perfil') === '1';
 
   useEffect(() => {
     if (!perfil?.id) return undefined;
@@ -192,18 +182,6 @@ export default function N28HomeSimplificado() {
           tarjeta de arriba no diga ya. */}
 
       <HistorialReciente perfil={perfil} />
-
-      {!esClinica && mostrarPerfil && (
-        <>
-          <PerfilAuxiliarInline onClose={() => setSearchParams({})} />
-          {/* El auxiliar configura sus habilidades aquí; la clínica no las
-              tiene en perfil (las declara por oferta, ver 0015). */}
-          <HabilidadesPerfilSection />
-          {/* Datos de pago del auxiliar (0029). La clínica no lleva esta
-              sección; ya está fuera por el `!esClinica` de arriba. */}
-          <MetodosPagoSection />
-        </>
-      )}
 
       <BottomNav />
     </div>

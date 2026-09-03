@@ -20,6 +20,7 @@ import N26Relevo from '../screens/n26-relevo';
 import ConversacionRelevo from '../screens/n26-relevo/ConversacionRelevo';
 import N27CatalogoServicios from '../screens/n27-catalogo-servicios';
 import N28HomeSimplificado from '../screens/n28-home-simplificado';
+import N28PerfilAuxiliar from '../screens/n28-perfil-auxiliar';
 import N29PerfilClinica from '../screens/n29-perfil-clinica';
 import N30CoberturaServicio from '../screens/n30-cobertura-servicio';
 import ChatCobertura from '../screens/n30-cobertura-servicio/ChatCobertura';
@@ -109,6 +110,7 @@ export default function AppRouter() {
       <Route path="/relevo" element={<ProtectedRoute><N26Relevo /></ProtectedRoute>} />
       <Route path="/relevo/conversacion/:conversacionId" element={<ProtectedRoute><ConversacionRelevo /></ProtectedRoute>} />
       <Route path="/servicios" element={<ProtectedRoute allowedRoles={['medico']}><N27CatalogoServicios /></ProtectedRoute>} />
+      <Route path="/perfil-auxiliar" element={<ProtectedRoute allowedRoles={['auxiliar']}><N28PerfilAuxiliar /></ProtectedRoute>} />
       <Route path="/perfil-clinica" element={<ProtectedRoute allowedRoles={['clinica']}><N29PerfilClinica /></ProtectedRoute>} />
       {/* MUVET Relevo (N-30): médico↔médico, pasar un servicio ya agendado.
           ⚠️ La ruta conserva el nombre viejo del módulo, "cobertura-servicio":

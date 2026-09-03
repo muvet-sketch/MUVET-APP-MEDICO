@@ -9,13 +9,12 @@ import { ICONO_ESPECIALISTAS, NOMBRE_ESPECIALISTAS } from '../../lib/nombresModu
 // junto con el enlace "Salir" que antes vivía suelto en el header de las dos
 // Home. Es el único lugar de la app donde se cierra sesión.
 //
-// Cada rol tiene su propia ruta de perfil (D-543: auxiliar y clínica no tienen
-// pantalla de perfil dedicada — el auxiliar reabre el panel inline de N-28 vía
-// ?perfil=1, la clínica sí tiene N-29).
+// Cada rol tiene su propia ruta de perfil: médico N-8, auxiliar N-28 Perfil
+// Auxiliar, clínica N-29.
 const RUTA_PERFIL = {
   medico: '/perfil',
   clinica: '/perfil-clinica',
-  auxiliar: '/home-simplificado?perfil=1',
+  auxiliar: '/perfil-auxiliar',
 };
 
 export default function AppMenu() {

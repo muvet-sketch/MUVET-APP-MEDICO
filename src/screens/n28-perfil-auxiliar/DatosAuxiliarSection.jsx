@@ -5,12 +5,11 @@ import { Card, Input, Button, Toast, ChipMultiSelect } from '../../components/ui
 import { ZONAS_COBERTURA, parseZonas, serializarZonas } from '../../lib/municipios';
 import { NOMBRE_TURNOS } from '../../lib/nombresModulos';
 
-// SUPUESTO: el Auxiliar no tiene una pantalla de perfil propia con número de
-// pantalla asignado (a diferencia de N-29 para Clínica) — el despacho de
-// Fase 7 (Acción 4) solo dice "acceso a perfil" para N-28 sin más detalle.
-// Se resuelve como sección editable inline, decisión confirmada con el
-// fundador durante esta fase (no como pantalla nueva).
-export default function PerfilAuxiliarInline({ onClose }) {
+// Datos básicos editables del auxiliar. Antes vivía como panel inline dentro
+// de la Home (N-28) reabierto vía ?perfil=1; ahora es una sección de la
+// pantalla de perfil dedicada (N-28 Perfil Auxiliar), en línea con lo que ya
+// tienen médico (N-8) y clínica (N-29).
+export default function DatosAuxiliarSection() {
   const { perfil, refreshPerfil } = useAuth();
   const [nombreCompleto, setNombreCompleto] = useState(perfil?.nombre_completo ?? '');
   const [telefono, setTelefono] = useState(perfil?.telefono ?? '');
@@ -49,12 +48,7 @@ export default function PerfilAuxiliarInline({ onClose }) {
 
   return (
     <Card className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-[14px] font-semibold text-[#0A1628]">Mi perfil</p>
-        <button type="button" onClick={onClose} className="text-[12px] text-[#5A6B7A] underline underline-offset-2">
-          Cerrar
-        </button>
-      </div>
+      <p className="text-[14px] font-semibold text-[#0A1628]">Datos básicos</p>
 
       <form onSubmit={handleGuardar} className="flex flex-col gap-3">
         <Input label="Nombre completo" required value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} />
