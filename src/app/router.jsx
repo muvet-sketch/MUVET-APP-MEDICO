@@ -137,9 +137,11 @@ export default function AppRouter() {
           (policy de insert de `especialista_conversaciones`).
           El hilo va en ruta propia para que las notificaciones de 0039 puedan
           hacer deep-link a una conversación concreta — mismo criterio que
-          /relevo/conversacion/:id y /apoyo/conversacion/:id. */}
-      <Route path="/especialistas" element={<ProtectedRoute><N35Especialistas /></ProtectedRoute>} />
-      <Route path="/especialistas/conversacion/:conversacionId" element={<ProtectedRoute><ConversacionEspecialista /></ProtectedRoute>} />
+          /relevo/conversacion/:id y /apoyo/conversacion/:id.
+          ⚠️ Solo médico y clínica: por decisión del fundador el auxiliar ya no
+          entra a MUVET Especialistas (antes publicaba en el tablón). */}
+      <Route path="/especialistas" element={<ProtectedRoute allowedRoles={['medico', 'clinica']}><N35Especialistas /></ProtectedRoute>} />
+      <Route path="/especialistas/conversacion/:conversacionId" element={<ProtectedRoute allowedRoles={['medico', 'clinica']}><ConversacionEspecialista /></ProtectedRoute>} />
       {/* N-31: Notificaciones (migración 0026). Abierta a los 3 actores, igual
           que /relevo y /historial — las notificaciones de MUVET Turnos le
           llegan a cualquiera de ellos; las de MUVET Relevo (médico↔médico)

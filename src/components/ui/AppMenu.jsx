@@ -49,6 +49,9 @@ export default function AppMenu() {
   if (!perfil) return null;
 
   const rutaPerfil = RUTA_PERFIL[perfil.rol] ?? '/home';
+  // MUVET Especialistas quedó restringido a médico y clínica (decisión del
+  // fundador): el auxiliar ya no ve ni el acceso ni la ruta.
+  const verEspecialistas = perfil.rol === 'medico' || perfil.rol === 'clinica';
 
   function irAlPerfil() {
     setAbierto(false);
@@ -101,21 +104,25 @@ export default function AppMenu() {
           >
             <span aria-hidden="true">👤</span> Mi perfil
           </button>
-          <div className="h-px bg-[#E1E8ED]" />
           {/* N-35 (0039): MUVET Especialistas es el CUARTO módulo gremial y la
               barra inferior del médico ya está llena con los otros tres, así
-              que este es su único acceso — igual que Mensajes. Abierto a los
-              tres roles: el médico y la clínica buscan especialistas, el
-              auxiliar publica en el tablón. Qué ve cada uno lo deciden las
-              pestañas de N-35 y la RLS de 0039, no este menú. */}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={irAEspecialistas}
-            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
-          >
-            <span aria-hidden="true">{ICONO_ESPECIALISTAS}</span> {NOMBRE_ESPECIALISTAS}
-          </button>
+              que este es su único acceso — igual que Mensajes. Solo médico y
+              clínica buscan especialistas en el directorio; el auxiliar ya no
+              entra (decisión del fundador). Qué ve cada rol admitido lo deciden
+              las pestañas de N-35 y la RLS de 0039, no este menú. */}
+          {verEspecialistas && (
+            <>
+              <div className="h-px bg-[#E1E8ED]" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={irAEspecialistas}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-[#0A1628] active:bg-[#F4F7F9]"
+              >
+                <span aria-hidden="true">{ICONO_ESPECIALISTAS}</span> {NOMBRE_ESPECIALISTAS}
+              </button>
+            </>
+          )}
           <div className="h-px bg-[#E1E8ED]" />
           {/* N-34: para el médico este es el ÚNICO acceso a Mensajes — su barra
               inferior está llena con los tres módulos gremiales. El auxiliar y

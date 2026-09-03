@@ -64,6 +64,10 @@ export const CORTO_RELEVO = 'Relevo';
 export const NOMBRE_AUXILIAR = 'MUVET Auxiliar';
 export const ICONO_AUXILIAR = '🧰';
 export const CORTO_AUXILIAR = 'Auxiliar';
+// Variante con descriptor, SOLO para la Home del auxiliar (N-28): desde su
+// perfil el módulo se anuncia como "apoya a un médico" para dejar claro su rol
+// en el matching. El médico lo sigue viendo como `NOMBRE_AUXILIAR` a secas.
+export const NOMBRE_AUXILIAR_DESDE_AUXILIAR = `${NOMBRE_AUXILIAR} (Apoya a un Médico)`;
 
 // Directorio de médicos especialistas + tablón de ofertas (N-35, migración
 // 0039). Identificador interno: `especialista`.

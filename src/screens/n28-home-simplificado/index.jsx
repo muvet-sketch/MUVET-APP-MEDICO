@@ -13,12 +13,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
 import { fetchMisPublicaciones, fetchMisConversaciones } from '../../lib/relevo';
 import { fetchMisPublicacionesApoyo, fetchMisConversacionesApoyo } from '../../lib/apoyo';
-import { fetchMisOfertasEspecialista, fetchMisConversacionesEspecialista } from '../../lib/especialistas';
+import { fetchMisConversacionesEspecialista } from '../../lib/especialistas';
 import {
   CORTO_AUXILIAR,
   CORTO_ESPECIALISTAS,
   CORTO_TURNOS,
-  NOMBRE_AUXILIAR,
+  NOMBRE_AUXILIAR_DESDE_AUXILIAR,
   NOMBRE_ESPECIALISTAS,
   NOMBRE_TURNOS,
 } from '../../lib/nombresModulos';
@@ -60,19 +60,22 @@ export default function N28HomeSimplificado() {
     if (!perfil?.id) return undefined;
     let active = true;
     const esAuxiliar = perfil.rol === 'auxiliar';
+    const esClinica = perfil.rol === 'clinica';
     const vacio = Promise.resolve([]);
 
     // allSettled: que falle MUVET Auxiliar no debe dejar en blanco los
     // contadores de MUVET Turnos, ni al revés.
-    // La clínica no publica en el tablón de N-35 (solo busca en el directorio),
-    // así que sus ofertas propias no se piden.
+    // MUVET Especialistas quedó restringido a médico y clínica (decisión del
+    // fundador): el auxiliar ya no entra. La clínica solo busca en el directorio
+    // —nunca publica ofertas propias—, así que de N-35 solo se le piden sus
+    // conversaciones.
     Promise.allSettled([
       fetchMisPublicaciones(perfil.id),
       fetchMisConversaciones(perfil.id),
       esAuxiliar ? fetchMisPublicacionesApoyo(perfil.id) : vacio,
       esAuxiliar ? fetchMisConversacionesApoyo(perfil.id) : vacio,
-      esAuxiliar ? fetchMisOfertasEspecialista(perfil.id) : vacio,
-      fetchMisConversacionesEspecialista(perfil.id),
+      vacio,
+      esClinica ? fetchMisConversacionesEspecialista(perfil.id) : vacio,
     ])
       .then(([turnosPubs, turnosConv, apoyoPubs, apoyoConv, espOfertas, espConv]) => {
         if (!active) return;
@@ -134,7 +137,7 @@ export default function N28HomeSimplificado() {
       {!esClinica && (
         <Card className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[14px] font-semibold text-[#0A1628]">{NOMBRE_AUXILIAR}</p>
+            <p className="text-[14px] font-semibold text-[#0A1628]">{NOMBRE_AUXILIAR_DESDE_AUXILIAR}</p>
             <p className="text-[12px] text-[#5A6B7A]">
               {loading
                 ? 'Cargando…'
@@ -147,26 +150,26 @@ export default function N28HomeSimplificado() {
         </Card>
       )}
 
-      {/* MUVET Especialistas (N-35, 0039). Los dos roles entran, a cosas
-          distintas: la clínica busca especialistas en el directorio (no publica
-          en el tablón, de ahí que no se le cuenten ofertas propias) y el
-          auxiliar publica para que los especialistas lo encuentren. Qué ve cada
-          uno lo deciden las pestañas de N-35 y la RLS de 0039. */}
-      <Card className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[14px] font-semibold text-[#0A1628]">{NOMBRE_ESPECIALISTAS}</p>
-          <p className="text-[12px] text-[#5A6B7A]">
-            {loading
-              ? 'Cargando…'
-              : esClinica
-                ? `Busca especialistas · ${contadores.especialistasConversaciones} conversación(es) abierta(s)`
-                : `${contadores.especialistasOfertas} oferta(s) activa(s) · ${contadores.especialistasConversaciones} conversación(es) abierta(s)`}
-          </p>
-        </div>
-        <Button variant="outline" fullWidth={false} onClick={() => navigate('/especialistas')}>
-          {`Ir a ${CORTO_ESPECIALISTAS}`}
-        </Button>
-      </Card>
+      {/* MUVET Especialistas (N-35, 0039). Restringido a médico y clínica
+          (decisión del fundador): el auxiliar ya no entra. Aquí solo la clínica,
+          que busca especialistas en el directorio —nunca publica en el tablón,
+          de ahí que no se le cuenten ofertas propias—. Qué ve lo deciden las
+          pestañas de N-35 y la RLS de 0039. */}
+      {esClinica && (
+        <Card className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[14px] font-semibold text-[#0A1628]">{NOMBRE_ESPECIALISTAS}</p>
+            <p className="text-[12px] text-[#5A6B7A]">
+              {loading
+                ? 'Cargando…'
+                : `Busca especialistas · ${contadores.especialistasConversaciones} conversación(es) abierta(s)`}
+            </p>
+          </div>
+          <Button variant="outline" fullWidth={false} onClick={() => navigate('/especialistas')}>
+            {`Ir a ${CORTO_ESPECIALISTAS}`}
+          </Button>
+        </Card>
+      )}
 
       {/* Lo acordado que sigue en curso: con quién, dónde, y la puerta al
           chat (0028). El auxiliar ve Turnos + Auxiliar; la clínica solo
