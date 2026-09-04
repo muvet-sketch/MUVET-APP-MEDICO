@@ -1,5 +1,13 @@
 @import "tailwindcss";
+@import "./fonts.css";
 @import "./tokens.css";
+
+/* Expone las familias como utilidades Tailwind: font-sans (cuerpo, Inter) y
+ * font-title (titulos, IBM Plex Sans). */
+@theme {
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-title: 'IBM Plex Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+}
 
 * {
   box-sizing: border-box;
@@ -12,10 +20,22 @@ body {
   min-height: 100svh;
   background: var(--color-bg-cold);
   color: var(--color-text-primary);
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
   font-size: var(--font-size-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Titulos con IBM Plex Sans en toda la app sin tocar cada pantalla. Las
+ * pantallas siguen controlando tamano y peso (text-*, font-semibold). */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-title);
+  letter-spacing: -0.014em;
 }
 
 #root {

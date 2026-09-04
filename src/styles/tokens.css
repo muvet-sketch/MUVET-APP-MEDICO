@@ -15,6 +15,10 @@
   --color-text-muted: #5A6B7A;
   --color-border: #E1E8ED;
 
+  /* Tipografia: cuerpo Inter, titulos IBM Plex Sans (ver fonts.css) */
+  --font-body: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-title: 'IBM Plex Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+
   --font-size-base: 14px;
   --font-size-sm: 12px;
   --font-size-lg: 16px;

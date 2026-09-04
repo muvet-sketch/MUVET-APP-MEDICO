@@ -56,6 +56,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Incluye las fuentes auto-alojadas (/public/fonts/*.woff2) en el
+        // precache para que los titulos/cuerpo funcionen sin red. El resto
+        // son los globs por defecto de vite-plugin-pwa.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // D-negocio implícita del despacho: datos de Supabase siempre
         // frescos, sin cache agresivo. Cache-first solo aplica (por
         // defecto, vía precacheAndRoute) a JS/CSS/fonts/iconos del build.
